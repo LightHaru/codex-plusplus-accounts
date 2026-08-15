@@ -8,6 +8,14 @@ All notable changes to [Codex Accounts](https://github.com/LightHaru/codex-plusp
 
 # English
 
+## 2.5.7 — 2026-08-16
+
+Docs/host rebrand to ChatGPT Layer. Tweak id unchanged.
+
+- Host product is now [ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer), not Codex++. Id stays `me.lightharu.codex-accounts` so existing installs are not duplicated.
+- Install from Settings → Tweak Store, or copy into `%APPDATA%\codex-plusplus\tweaks\codex-plusplus-accounts` (those paths did not change).
+- ChatGPT Layer checks GitHub `releases/latest` and prompts Update. Ship a Release with a semver tag (`v2.5.7`); pushing `main` without a Release does not notify users.
+
 ## 2.5.6 — 2026-08-16
 
 Windows tray icon so you can fully quit ChatGPT.
@@ -80,6 +88,14 @@ Initial public snapshot (then named Codex Avatar Switcher).
 ---
 
 # Tiếng Việt
+
+## 2.5.7 — 2026-08-16
+
+Đổi docs/host sang ChatGPT Layer. Tweak id không đổi.
+
+- Host giờ là [ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer), không còn Codex++. Id vẫn `me.lightharu.codex-accounts` để không cài trùng bản đang có.
+- Cài từ Settings → Tweak Store, hoặc copy vào `%APPDATA%\codex-plusplus\tweaks\codex-plusplus-accounts` (đường dẫn data không đổi).
+- ChatGPT Layer check GitHub `releases/latest` rồi hiện Update. Ship Release với tag semver (`v2.5.7`); chỉ push `main` thì người dùng không được báo.
 
 ## 2.5.6 — 2026-08-16
 

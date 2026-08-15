@@ -15,14 +15,14 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-2.5.6-4F8CFF?style=flat-square">
-  <img alt="codex++ tweak" src="https://img.shields.io/badge/Codex%2B%2B-tweak-111827?style=flat-square">
+  <img alt="version" src="https://img.shields.io/badge/version-2.5.7-4F8CFF?style=flat-square">
+  <img alt="ChatGPT Layer tweak" src="https://img.shields.io/badge/ChatGPT%20Layer-tweak-111827?style=flat-square">
   <img alt="platforms" src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square">
-  <a href="https://github.com/b-nnett/codex-plusplus"><img alt="requires Codex++" src="https://img.shields.io/badge/requires-Codex%2B%2B-6366f1?style=flat-square"></a>
+  <a href="https://github.com/LightHaru/chatgpt-layer"><img alt="requires ChatGPT Layer" src="https://img.shields.io/badge/requires-ChatGPT%20Layer-6366f1?style=flat-square"></a>
 </p>
 
 <p align="center">
-  A <a href="https://github.com/b-nnett/codex-plusplus">Codex++</a> tweak ·
+  A <a href="https://github.com/LightHaru/chatgpt-layer">ChatGPT Layer</a> tweak ·
   <a href="https://github.com/LightHaru/codex-plusplus-accounts">LightHaru/codex-plusplus-accounts</a>
   · <a href="CHANGELOG.md">Changelog</a>
 </p>
@@ -55,30 +55,37 @@ Based on [Easy Account Switcher](https://github.com/erknvl/codex-plusplus-accoun
 | UI | Accounts page in the sidebar | Avatar popup + matching sidebar page |
 | Quota | Cached 5h / weekly | % on each row, auto-switch when the current one is empty |
 | Add account | Logout + restart | Separate login window, live session kept |
-| Store | Codex++ Tweak Store (`erknvl/...`) | This repo. **Do not Update the Store copy** |
+| Store | Codex++ Tweak Store (`erknvl/...`) | [ChatGPT Layer Tweak Store](https://github.com/LightHaru/chatgpt-layer) (this repo). **Do not Update Easy Account Switcher** |
 
 ## Install
 
-Codex++ is required. Open Codex with the **Codex++ shortcut**, not the Microsoft Store icon.
+[ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer) is required. Launch ChatGPT with the **ChatGPT Layer** shortcut (`ChatGPT.exe`), not the Microsoft Store icon and not the `Codex.exe` stub in the same folder.
 
-1. Install [Codex++](https://github.com/b-nnett/codex-plusplus).
-2. Clone this repo:
+### From the Tweak Store (recommended)
+
+1. Install [ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer).
+2. Open the **ChatGPT Layer** shortcut.
+3. Settings → Tweak Store → Install **Codex Accounts**.
+4. If **Easy Account Switcher** (`me.erkin.codex-plusplus-account-switcher`) is installed, turn it off or remove it. Both tweaks do the same job. A Store Update of that one will overwrite files and bring the old UI back.
+5. Fully quit ChatGPT (including the Codex Accounts tray icon), then open the ChatGPT Layer shortcut again. Closing the avatar popup is not enough to load new tweak code.
+
+### Manual copy (fallback)
+
+1. Clone this repo:
 
 ```bat
 git clone https://github.com/LightHaru/codex-plusplus-accounts.git
 ```
 
-3. Copy the folder to:
+2. Copy the folder to:
 
 ```
 %APPDATA%\codex-plusplus\tweaks\codex-plusplus-accounts
 ```
 
-The folder must contain `manifest.json` and `index.bundled.js`.
+The folder must contain `manifest.json` and `index.bundled.js`. Data paths did not change with the ChatGPT Layer rebrand.
 
-4. If **Easy Account Switcher** (`me.erkin.codex-plusplus-account-switcher`) is installed, turn it off or remove it. Both tweaks do the same job. A Store Update of that one will overwrite files and bring the old UI back.
-
-5. Fully quit Codex++ (including the tray icon), then open the Codex++ shortcut again. Closing the avatar popup is not enough to load new tweak code.
+3. Same Easy Account Switcher warning as above, then fully quit and reopen the **ChatGPT Layer** shortcut.
 
 **macOS**
 
@@ -92,6 +99,12 @@ The folder must contain `manifest.json` and `index.bundled.js`.
 ~/.config/codex-plusplus/tweaks/codex-plusplus-accounts
 ```
 
+### Updates
+
+When you ship a new version, **create a GitHub Release with a semver tag** (for example `v2.5.7`). ChatGPT Layer checks `releases/latest` and prompts **Update**. Pushing `main` without a Release does not notify users.
+
+Tweak id stays `me.lightharu.codex-accounts`. Do not change it — a new id duplicates the install.
+
 ## Usage
 
 1. Click the avatar in the bottom-left corner.
@@ -104,9 +117,9 @@ Use the sidebar **Accounts** page (below Plugins) to delete a saved snapshot.
 
 ### Did the session actually change?
 
-Yes. Switch copies `~/.codex/auth_accounts/<name>.json` over `~/.codex/auth.json` (access / refresh / id token). Codex requests after that pick up the new tokens.
+Yes. Switch copies `~/.codex/auth_accounts/<name>.json` over `~/.codex/auth.json` (access / refresh / id token). ChatGPT / Codex requests after that pick up the new tokens.
 
-The native Codex header name, avatar, and Usage % can stay stale because the app keeps identity in memory. Trust the popup list. Restart Codex only if you want the stock header to match.
+The native header name, avatar, and Usage % can stay stale because the app keeps identity in memory. Trust the popup list. Restart ChatGPT only if you want the stock header to match.
 
 ### Quota
 
@@ -117,12 +130,12 @@ Reset times use the machine's local timezone (example: `Thu, 20/08/2026, 18:06`)
 ### What this tweak does not do
 
 - Does not pool several ChatGPT plans into one limit (no fake 360%).
-- Does not MITM or proxy Codex traffic.
+- Does not MITM or proxy ChatGPT / Codex traffic.
 - Auto-switch changes the live session when the current account is exhausted. It does not split requests across accounts.
 
 ## Windows Store / Owl note
 
-The real GUI binary is `ChatGPT.exe`, not `Codex.exe`. Calling `app.relaunch()` on the Store build often jumps to the unpatched Store app. This tweak does **not** relaunch on switch or Add account.
+The real GUI binary is `ChatGPT.exe`, not `Codex.exe`. The Store `Codex.exe` in the same folder is a stub that exits. Calling `app.relaunch()` on the Store build often jumps to the unpatched Store app. This tweak does **not** relaunch on switch or Add account. Always launch from the **ChatGPT Layer** shortcut.
 
 ## Files on disk
 
@@ -133,6 +146,8 @@ The real GUI binary is `ChatGPT.exe`, not `Codex.exe`. Calling `app.relaunch()` 
 | Current account marker | `%USERPROFILE%\.codex\current_account` |
 | Quota cache | `%USERPROFILE%\.codex\auth_accounts_usage.json` |
 | Auto-switch setting | `%USERPROFILE%\.codex\auth_accounts_autoswitch.json` |
+
+Tweak files stay under `%APPDATA%\codex-plusplus\tweaks\codex-plusplus-accounts` (ChatGPT Layer kept the Codex++ data directory).
 
 ## Build / test
 
@@ -149,8 +164,9 @@ Tweak id: `me.lightharu.codex-accounts`
 
 ## Credits
 
-- [erknvl](https://github.com/erknvl/) — [Easy Account Switcher](https://github.com/erknvl/codex-plusplus-account-switcher) (`auth.json` snapshots, Accounts page, Codex++ hook)
-- [Bennett / Codex++](https://github.com/b-nnett/codex-plusplus) — tweak runtime
+- [erknvl](https://github.com/erknvl/) — [Easy Account Switcher](https://github.com/erknvl/codex-plusplus-account-switcher) (`auth.json` snapshots, Accounts page, original host hook)
+- [Bennett](https://github.com/b-nnett/codex-plusplus) — original Codex++ loader
+- [ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer) — maintained host (LightHaru/chatgpt-layer)
 
 ---
 
@@ -167,7 +183,7 @@ Phát triển từ [Easy Account Switcher](https://github.com/erknvl/codex-plusp
 - Đổi acc từ popup avatar. Cửa sổ không tắt.
 - Badge **Current** trên acc đang dùng (tên thật, không ghi "Primary").
 - % còn lại 5 giờ / weekly từng acc, kèm thứ / ngày / giờ reset.
-- **Add another subscription** mở cửa sổ OAuth riêng. Session đang dùng giữ nguyên đến khi bấm acc mới.
+- **Add another subscription** mở cửa sổ OAuth riêng. Session đang dùng giữ nguyên đến khi bạn bấm acc mới.
 - **Auto-switch when quota runs out** (mặc định bật): chỉ nhảy khi acc hiện tại hết 5h **hoặc** weekly (còn 0), và chỉ sang acc còn %. Cả list 0% thì đứng yên.
 - Trang **Accounts** trên sidebar giống popup (avatar, Current, %, bấm để đổi). Menu 3 chấm vẫn xóa snapshot.
 - Icon khay Windows (**Codex Accounts**) trong overflow: chuột trái mở cửa sổ, chuột phải **Quit** tắt hẳn `ChatGPT.exe`.
@@ -180,30 +196,37 @@ Phát triển từ [Easy Account Switcher](https://github.com/erknvl/codex-plusp
 | UI | Trang Accounts trên sidebar | Popup avatar + trang sidebar cùng style |
 | Quota | Cache 5h / weekly | Hiện % từng acc, auto-switch khi acc hiện tại hết |
 | Add acc | Logout + restart | Cửa sổ login riêng, session đang dùng giữ nguyên |
-| Store | Tweak Store (`erknvl/...`) | Repo này. **Đừng Update bản Store gốc** |
+| Store | Codex++ Tweak Store (`erknvl/...`) | [ChatGPT Layer Tweak Store](https://github.com/LightHaru/chatgpt-layer) (repo này). **Đừng Update Easy Account Switcher** |
 
 ## Cài đặt
 
-Cần [Codex++](https://github.com/b-nnett/codex-plusplus). Mở Codex bằng **shortcut Codex++**, không phải icon Microsoft Store.
+Cần [ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer). Bạn mở ChatGPT bằng shortcut **ChatGPT Layer** (`ChatGPT.exe`), không phải icon Microsoft Store, không phải stub `Codex.exe` cùng thư mục.
 
-1. Cài Codex++.
-2. Clone repo:
+### Từ Tweak Store (nên dùng)
+
+1. Cài [ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer).
+2. Mở shortcut **ChatGPT Layer**.
+3. Settings → Tweak Store → Install **Codex Accounts**.
+4. Nếu bạn đang cài **Easy Account Switcher** (`me.erkin.codex-plusplus-account-switcher`) thì tắt / gỡ. Hai tweak trùng chức năng. Store Update bản đó sẽ đè file và kéo UI cũ.
+5. Đóng **hẳn** ChatGPT (cả icon khay Codex Accounts), rồi mở lại shortcut ChatGPT Layer. Chỉ đóng/mở popup avatar **không** đủ để nạp code mới.
+
+### Copy tay (dự phòng)
+
+1. Clone repo:
 
 ```bat
 git clone https://github.com/LightHaru/codex-plusplus-accounts.git
 ```
 
-3. Copy nguyên folder vào:
+2. Copy nguyên folder vào:
 
 ```
 %APPDATA%\codex-plusplus\tweaks\codex-plusplus-accounts
 ```
 
-Cần có `manifest.json` và `index.bundled.js` trong folder đó.
+Cần có `manifest.json` và `index.bundled.js` trong folder đó. Đường dẫn data **không** đổi khi host chuyển sang ChatGPT Layer.
 
-4. Nếu đang cài **Easy Account Switcher** (`me.erkin.codex-plusplus-account-switcher`) thì tắt / gỡ. Hai tweak trùng chức năng. Store Update bản đó sẽ đè file và kéo UI cũ.
-
-5. Đóng **hẳn** Codex++ (cả khay hệ thống), rồi mở lại shortcut Codex++. Chỉ đóng/mở popup avatar **không** đủ để nạp code mới.
+3. Cùng cảnh báo Easy Account Switcher như trên, rồi đóng hẳn app và mở lại shortcut **ChatGPT Layer**.
 
 **macOS**
 
@@ -217,21 +240,27 @@ Cần có `manifest.json` và `index.bundled.js` trong folder đó.
 ~/.config/codex-plusplus/tweaks/codex-plusplus-accounts
 ```
 
+### Cập nhật
+
+Khi bạn ship bản mới, **tạo GitHub Release với tag semver** (ví dụ `v2.5.7`). ChatGPT Layer check `releases/latest` rồi hiện **Update**. Push `main` mà không có Release thì người dùng không được báo.
+
+Tweak id giữ nguyên `me.lightharu.codex-accounts`. Đừng đổi id — id mới sẽ cài trùng bản.
+
 ## Hướng dẫn dùng
 
 1. Bấm avatar góc dưới bên trái.
 2. List acc hiện trong popup: Usage remaining, % từng acc, giờ reset, badge **Current**.
 3. Bấm acc khác: token trong `auth.json` đổi sang acc đó, cửa sổ không tắt.
-4. Để **Auto-switch when quota runs out** bật nếu muốn tự hop khi acc đang dùng về 0% (5h hoặc weekly). Không xoay vòng các acc đã hết.
-5. **Add another subscription** mở cửa sổ login, lưu snapshot acc mới, **không logout / không restart**. Bấm dòng acc mới khi muốn chuyển.
+4. Để **Auto-switch when quota runs out** bật nếu bạn muốn tự hop khi acc đang dùng về 0% (5h hoặc weekly). Không xoay vòng các acc đã hết.
+5. **Add another subscription** mở cửa sổ login, lưu snapshot acc mới, **không logout / không restart**. Bấm dòng acc mới khi bạn muốn chuyển.
 
 Trang **Accounts** trên sidebar (sau Plugins) dùng để xóa snapshot.
 
 ### Session có đổi thật không?
 
-Có. Switch copy `~/.codex/auth_accounts/<tên>.json` đè lên `~/.codex/auth.json` (access / refresh / id token). Request Codex sau đó lấy token mới.
+Có. Switch copy `~/.codex/auth_accounts/<tên>.json` đè lên `~/.codex/auth.json` (access / refresh / id token). Request ChatGPT / Codex sau đó lấy token mới.
 
-Tên, avatar và dòng Usage **gốc** của Codex có thể còn stale vì app giữ identity trong bộ nhớ. Nhìn list trong popup. Restart Codex chỉ khi muốn header gốc khớp luôn.
+Tên, avatar và dòng Usage **gốc** có thể còn stale vì app giữ identity trong bộ nhớ. Nhìn list trong popup. Restart ChatGPT chỉ khi bạn muốn header gốc khớp luôn.
 
 ### Quota
 
@@ -242,12 +271,12 @@ Giờ reset theo timezone máy (ví dụ `Th 5, 20/08/2026, 18:06`).
 ### Không làm gì
 
 - Không pool nhiều gói ChatGPT thành một hạn mức (không cộng 360%).
-- Không MITM / proxy request Codex.
+- Không MITM / proxy request ChatGPT / Codex.
 - Auto-switch chỉ đổi session khi acc đang dùng đã hết quota, không chia từng request.
 
 ## Lưu ý Windows Store / Owl
 
-App GUI thật là `ChatGPT.exe`, không phải `Codex.exe`. `app.relaunch()` trên bản Store hay nhảy sang app chưa patch. Tweak này **không** dùng `app.relaunch()` khi switch hay Add account.
+App GUI thật là `ChatGPT.exe`, không phải `Codex.exe`. `Codex.exe` cùng thư mục là stub, mở lên là thoát. `app.relaunch()` trên bản Store hay nhảy sang app chưa patch. Tweak này **không** dùng `app.relaunch()` khi switch hay Add account. Luôn mở từ shortcut **ChatGPT Layer**.
 
 ## File lưu trên máy
 
@@ -259,11 +288,13 @@ App GUI thật là `ChatGPT.exe`, không phải `Codex.exe`. `app.relaunch()` tr
 | Cache quota | `%USERPROFILE%\.codex\auth_accounts_usage.json` |
 | Auto-switch | `%USERPROFILE%\.codex\auth_accounts_autoswitch.json` |
 
+File tweak vẫn nằm ở `%APPDATA%\codex-plusplus\tweaks\codex-plusplus-accounts` (ChatGPT Layer giữ nguyên thư mục data Codex++).
+
 ## Build / test
 
 ```sh
 npx esbuild index.js --bundle --platform=node --format=cjs --outfile=index.bundled.js --external:electron
-node --test test/account-service.test.js test/profile-menu.test.js
+node --test test/account-service.test.js test/display.test.js test/profile-menu.test.js test/tray.test.js
 node --check index.js
 node --check index.bundled.js
 ```
@@ -274,5 +305,6 @@ Tweak id: `me.lightharu.codex-accounts`
 
 ## Cảm ơn
 
-- [erknvl](https://github.com/erknvl/) — [Easy Account Switcher](https://github.com/erknvl/codex-plusplus-account-switcher) (snapshot `auth.json`, trang Accounts, móc vào Codex++)
-- [Bennett / Codex++](https://github.com/b-nnett/codex-plusplus) — runtime load tweak
+- [erknvl](https://github.com/erknvl/) — [Easy Account Switcher](https://github.com/erknvl/codex-plusplus-account-switcher) (snapshot `auth.json`, trang Accounts, móc host ban đầu)
+- [Bennett](https://github.com/b-nnett/codex-plusplus) — loader Codex++ gốc
+- [ChatGPT Layer](https://github.com/LightHaru/chatgpt-layer) — host đang maintain (LightHaru/chatgpt-layer)

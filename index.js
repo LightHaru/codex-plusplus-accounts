@@ -1,10 +1,11 @@
 /**
  * Codex Accounts
  *
- * Codex++ tweak that switches saved Codex sessions from the native avatar
- * menu (sidebar Accounts page remains as fallback). Main process owns all
- * auth file operations; renderer only sends account names and receives
- * snapshot metadata. Switching copies auth.json and does not relaunch.
+ * ChatGPT Layer tweak that switches saved ChatGPT / Codex sessions from
+ * the native avatar menu (sidebar Accounts page remains as fallback).
+ * Main process owns all auth file operations; renderer only sends
+ * account names and receives snapshot metadata. Switching copies
+ * auth.json and does not relaunch.
  *
  * Entry point — delegates immediately to the appropriate process module.
  */

@@ -64,7 +64,7 @@ async function switchAccount(rawName, api) {
  * After swapping ~/.codex/auth.json, probe the live Codex host so later
  * ChatGPT/Codex fetches pick up the new tokens without killing the window.
  *
- * There is no public Codex++ auth-refresh API. We do not reload BrowserWindow
+ * There is no public ChatGPT Layer auth-refresh API. We do not reload BrowserWindow
  * or relaunch the app. A usage fetch through the existing electronBridge path
  * is the safe in-process nudge: the native host attaches auth from auth.json.
  */
