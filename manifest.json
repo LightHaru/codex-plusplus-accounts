@@ -1,0 +1,18 @@
+{
+  "id": "me.lightharu.codex-avatar-switcher",
+  "name": "Codex Avatar Switcher",
+  "version": "2.2.1",
+  "description": "Switch saved Codex sessions from the native avatar menu without restarting Codex.",
+  "githubRepo": "LightHaru/codex-avatar-switcher",
+  "author": {
+    "name": "LightHaru",
+    "url": "https://github.com/LightHaru/"
+  },
+  "tags": [
+    "auth",
+    "accounts",
+    "settings"
+  ],
+  "scope": "both",
+  "main": "index.bundled.js"
+}

@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+*.log
+.codexpp-store.json
+.codexpp-dev-reload
+dist/
