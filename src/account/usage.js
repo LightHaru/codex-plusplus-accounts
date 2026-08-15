@@ -1,5 +1,8 @@
 const { nodeDeps, codexAuthPaths, ensureDir } = require("../node-utils");
 
+const USAGE_HOST = "chatgpt.com";
+const USAGE_PATH = "/backend-api/wham/usage";
+
 async function readAccountUsage(accounts) {
   const { fsp } = nodeDeps();
   const { USAGE_CACHE_PATH } = codexAuthPaths();
@@ -65,6 +68,85 @@ async function fetchActiveUsageSnapshot(api) {
   }
   const usage = await fetchUsageInCodexWebview();
   return snapshotFromUsagePayload(usage);
+}
+
+function extractAuthCredentials(auth) {
+  const tokens = auth?.tokens && typeof auth.tokens === "object" ? auth.tokens : null;
+  const accessToken = typeof tokens?.access_token === "string" ? tokens.access_token.trim() : "";
+  const accountId = typeof tokens?.account_id === "string" ? tokens.account_id.trim() : "";
+  if (!accessToken) throw new Error("No access_token in auth snapshot");
+  return { accessToken, accountId };
+}
+
+function nodeHttps() {
+  const nodeRequire = eval("require");
+  return nodeRequire("node:https");
+}
+
+function httpsGetJson(hostname, path, headers) {
+  return new Promise((resolve, reject) => {
+    const req = nodeHttps().request(
+      {
+        hostname,
+        path,
+        method: "GET",
+        headers,
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (chunk) => chunks.push(chunk));
+        res.on("end", () => {
+          const body = Buffer.concat(chunks).toString("utf8");
+          const status = res.statusCode || 0;
+          if (status >= 300 && status < 400 && res.headers.location) {
+            try {
+              const next = new URL(res.headers.location, `https://${hostname}${path}`);
+              httpsGetJson(next.hostname, `${next.pathname}${next.search}`, headers).then(resolve, reject);
+            } catch (error) {
+              reject(error);
+            }
+            return;
+          }
+          if (status < 200 || status >= 300) {
+            reject(new Error(`HTTP ${status}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(body));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+    req.on("error", reject);
+    req.setTimeout(10000, () => {
+      req.destroy();
+      reject(new Error("usage request timed out"));
+    });
+    req.end();
+  });
+}
+
+async function fetchUsageOverHttps(auth) {
+  const { accessToken, accountId } = extractAuthCredentials(auth);
+  const headers = {
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+  };
+  if (accountId) headers["ChatGPT-Account-Id"] = accountId;
+  const payload = await httpsGetJson(USAGE_HOST, USAGE_PATH, headers);
+  return snapshotFromUsagePayload(payload);
+}
+
+async function fetchUsageSnapshotForAuth(auth, api) {
+  if (typeof api?.fetchUsageWithAuth === "function") {
+    return api.fetchUsageWithAuth(auth);
+  }
+  if (typeof api?.fetchActiveUsage === "function") {
+    throw new Error("per-account usage mock missing");
+  }
+  return fetchUsageOverHttps(auth);
 }
 
 async function fetchUsageInCodexWebview() {
@@ -211,5 +293,6 @@ module.exports = {
   normalizeUsageSnapshot,
   normalizeUsageWindow,
   fetchActiveUsageSnapshot,
+  fetchUsageSnapshotForAuth,
   snapshotFromUsagePayload,
 };

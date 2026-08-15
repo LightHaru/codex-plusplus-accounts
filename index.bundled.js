@@ -7,9 +7,9 @@ var __commonJS = (cb, mod) => function __require() {
   }
 };
 
-// codex-plusplus-account-switcher/src/constants.js
+// src/constants.js
 var require_constants = __commonJS({
-  "codex-plusplus-account-switcher/src/constants.js"(exports2, module2) {
+  "src/constants.js"(exports2, module2) {
     var GLOBAL_SERVICE_KEY2 = "__codexpp_account_switcher_service__";
     var IPC_HANDLER_KEY2 = "__codexpp_account_switcher_ipc_handler__";
     var IPC_CHANNEL2 = "account-switcher";
@@ -18,9 +18,9 @@ var require_constants = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/utils.js
+// src/utils.js
 var require_utils = __commonJS({
-  "codex-plusplus-account-switcher/src/utils.js"(exports2, module2) {
+  "src/utils.js"(exports2, module2) {
     function ok(state) {
       return { ok: true, state };
     }
@@ -37,9 +37,9 @@ var require_utils = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/i18n.js
+// src/i18n.js
 var require_i18n = __commonJS({
-  "codex-plusplus-account-switcher/src/i18n.js"(exports2, module2) {
+  "src/i18n.js"(exports2, module2) {
     var STRINGS = {
       "accounts.loading": "Loading saved accounts...",
       "accounts.refresh": "Refresh accounts",
@@ -102,9 +102,9 @@ var require_i18n = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/node-utils.js
+// src/node-utils.js
 var require_node_utils = __commonJS({
-  "codex-plusplus-account-switcher/src/node-utils.js"(exports2, module2) {
+  "src/node-utils.js"(exports2, module2) {
     var { ACCOUNT_NAME_PATTERN } = require_constants();
     function nodeDeps2() {
       return {
@@ -159,9 +159,9 @@ var require_node_utils = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/auth.js
+// src/account/auth.js
 var require_auth = __commonJS({
-  "codex-plusplus-account-switcher/src/account/auth.js"(exports2, module2) {
+  "src/account/auth.js"(exports2, module2) {
     function emailFromAuthString(raw) {
       try {
         return emailFromAuth(JSON.parse(raw));
@@ -215,9 +215,9 @@ var require_auth = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/storage.js
+// src/account/storage.js
 var require_storage = __commonJS({
-  "codex-plusplus-account-switcher/src/account/storage.js"(exports2, module2) {
+  "src/account/storage.js"(exports2, module2) {
     var {
       nodeDeps: nodeDeps2,
       codexAuthPaths: codexAuthPaths2,
@@ -367,10 +367,12 @@ var require_storage = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/usage.js
+// src/account/usage.js
 var require_usage = __commonJS({
-  "codex-plusplus-account-switcher/src/account/usage.js"(exports, module) {
+  "src/account/usage.js"(exports, module) {
     var { nodeDeps, codexAuthPaths, ensureDir } = require_node_utils();
+    var USAGE_HOST = "chatgpt.com";
+    var USAGE_PATH = "/backend-api/wham/usage";
     async function readAccountUsage(accounts) {
       const { fsp } = nodeDeps();
       const { USAGE_CACHE_PATH } = codexAuthPaths();
@@ -430,6 +432,80 @@ var require_usage = __commonJS({
       }
       const usage = await fetchUsageInCodexWebview();
       return snapshotFromUsagePayload(usage);
+    }
+    function extractAuthCredentials(auth) {
+      const tokens = auth?.tokens && typeof auth.tokens === "object" ? auth.tokens : null;
+      const accessToken = typeof tokens?.access_token === "string" ? tokens.access_token.trim() : "";
+      const accountId = typeof tokens?.account_id === "string" ? tokens.account_id.trim() : "";
+      if (!accessToken) throw new Error("No access_token in auth snapshot");
+      return { accessToken, accountId };
+    }
+    function nodeHttps() {
+      const nodeRequire = eval("require");
+      return nodeRequire("node:https");
+    }
+    function httpsGetJson(hostname, path, headers) {
+      return new Promise((resolve, reject) => {
+        const req = nodeHttps().request(
+          {
+            hostname,
+            path,
+            method: "GET",
+            headers
+          },
+          (res) => {
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => {
+              const body = Buffer.concat(chunks).toString("utf8");
+              const status = res.statusCode || 0;
+              if (status >= 300 && status < 400 && res.headers.location) {
+                try {
+                  const next = new URL(res.headers.location, `https://${hostname}${path}`);
+                  httpsGetJson(next.hostname, `${next.pathname}${next.search}`, headers).then(resolve, reject);
+                } catch (error) {
+                  reject(error);
+                }
+                return;
+              }
+              if (status < 200 || status >= 300) {
+                reject(new Error(`HTTP ${status}`));
+                return;
+              }
+              try {
+                resolve(JSON.parse(body));
+              } catch (error) {
+                reject(error);
+              }
+            });
+          }
+        );
+        req.on("error", reject);
+        req.setTimeout(1e4, () => {
+          req.destroy();
+          reject(new Error("usage request timed out"));
+        });
+        req.end();
+      });
+    }
+    async function fetchUsageOverHttps(auth) {
+      const { accessToken, accountId } = extractAuthCredentials(auth);
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json"
+      };
+      if (accountId) headers["ChatGPT-Account-Id"] = accountId;
+      const payload = await httpsGetJson(USAGE_HOST, USAGE_PATH, headers);
+      return snapshotFromUsagePayload(payload);
+    }
+    async function fetchUsageSnapshotForAuth(auth, api2) {
+      if (typeof api2?.fetchUsageWithAuth === "function") {
+        return api2.fetchUsageWithAuth(auth);
+      }
+      if (typeof api2?.fetchActiveUsage === "function") {
+        throw new Error("per-account usage mock missing");
+      }
+      return fetchUsageOverHttps(auth);
     }
     async function fetchUsageInCodexWebview() {
       const electronRequire = eval("require");
@@ -565,14 +641,15 @@ var require_usage = __commonJS({
       normalizeUsageSnapshot,
       normalizeUsageWindow,
       fetchActiveUsageSnapshot,
+      fetchUsageSnapshotForAuth,
       snapshotFromUsagePayload
     };
   }
 });
 
-// codex-plusplus-account-switcher/src/account/settings.js
+// src/account/settings.js
 var require_settings = __commonJS({
-  "codex-plusplus-account-switcher/src/account/settings.js"(exports2, module2) {
+  "src/account/settings.js"(exports2, module2) {
     var { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, ensureDir: ensureDir2 } = require_node_utils();
     async function readAutoswitchEnabled() {
       const { fsp } = nodeDeps2();
@@ -600,9 +677,9 @@ var require_settings = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/state.js
+// src/account/state.js
 var require_state = __commonJS({
-  "codex-plusplus-account-switcher/src/account/state.js"(exports2, module2) {
+  "src/account/state.js"(exports2, module2) {
     var { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, accountPath: accountPath2, pathExists: pathExists2 } = require_node_utils();
     var { profileFromAuthString } = require_auth();
     var {
@@ -692,9 +769,9 @@ var require_state = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/config.js
+// src/account/config.js
 var require_config = __commonJS({
-  "codex-plusplus-account-switcher/src/account/config.js"(exports2, module2) {
+  "src/account/config.js"(exports2, module2) {
     var { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, ensureDir: ensureDir2 } = require_node_utils();
     async function saveAuthSnapshotWithCurrentBaseUrl2(sourcePath, targetPath) {
       const { fsp } = nodeDeps2();
@@ -814,9 +891,9 @@ var require_config = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/failover.js
+// src/account/failover.js
 var require_failover = __commonJS({
-  "codex-plusplus-account-switcher/src/account/failover.js"(exports2, module2) {
+  "src/account/failover.js"(exports2, module2) {
     function windowPct(usage, key) {
       const pct = usage?.[key]?.pct;
       return typeof pct === "number" && Number.isFinite(pct) ? pct : null;
@@ -865,9 +942,9 @@ var require_failover = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/login.js
+// src/account/login.js
 var require_login = __commonJS({
-  "codex-plusplus-account-switcher/src/account/login.js"(exports, module) {
+  "src/account/login.js"(exports, module) {
     var crypto = require("node:crypto");
     var https = require("node:https");
     var { profileFromAuth } = require_auth();
@@ -1155,9 +1232,9 @@ var require_login = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/actions.js
+// src/account/actions.js
 var require_actions = __commonJS({
-  "codex-plusplus-account-switcher/src/account/actions.js"(exports, module) {
+  "src/account/actions.js"(exports, module) {
     var { t } = require_i18n();
     var {
       nodeDeps,
@@ -1169,7 +1246,7 @@ var require_actions = __commonJS({
     } = require_node_utils();
     var { readState } = require_state();
     var { getCurrentAccountName, listAccountNames } = require_storage();
-    var { fetchActiveUsageSnapshot, writeAccountUsage } = require_usage();
+    var { fetchActiveUsageSnapshot, fetchUsageSnapshotForAuth, writeAccountUsage } = require_usage();
     var {
       readAuthJson,
       saveAuthSnapshotWithCurrentBaseUrl,
@@ -1226,8 +1303,13 @@ var require_actions = __commonJS({
         api2?.log?.warn?.(`[account-switcher] in-process auth refresh failed: ${message}`);
       }
       try {
-        const snapshot = await fetchActiveUsageSnapshot(api2);
-        await writeAccountUsage(name, snapshot);
+        await fetchActiveUsageSnapshot(api2);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        api2?.log?.warn?.(`[account-switcher] post-switch live usage nudge failed: ${message}`);
+      }
+      try {
+        await refreshUsageForSavedAccount(name, api2, { allowLiveFallback: true });
         api2?.log?.info?.(`[account-switcher] post-switch usage fetch succeeded for ${name}`);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -1278,12 +1360,35 @@ var require_actions = __commonJS({
         requiresAppRelaunch: true
       });
     }
-    async function refreshActiveUsage(api2) {
+    async function refreshUsageForSavedAccount(name, api2, options = {}) {
+      const { allowLiveFallback = false } = options;
+      try {
+        const { readAuthJson: readAuthJson2 } = require_config();
+        const auth = await readAuthJson2(accountPath(name), `Saved account ${name}`);
+        const snapshot = await fetchUsageSnapshotForAuth(auth, api2);
+        await writeAccountUsage(name, snapshot);
+        return snapshot;
+      } catch (error) {
+        if (!allowLiveFallback) throw error;
+        const snapshot = await fetchActiveUsageSnapshot(api2);
+        await writeAccountUsage(name, snapshot);
+        return snapshot;
+      }
+    }
+    async function refreshAllSavedAccountUsage(api2) {
       const accounts = await listAccountNames();
       const current = await getCurrentAccountName(accounts);
-      if (!current) return readState();
-      const snapshot = await fetchActiveUsageSnapshot(api2);
-      await writeAccountUsage(current, snapshot);
+      for (const name of accounts) {
+        try {
+          await refreshUsageForSavedAccount(name, api2, { allowLiveFallback: name === current });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          api2?.log?.warn?.(`[account-switcher] usage fetch failed for ${name}: ${message}`);
+        }
+      }
+    }
+    async function refreshActiveUsage(api2) {
+      await refreshAllSavedAccountUsage(api2);
       return maybeFailover(api2);
     }
     var failoverBusy = false;
@@ -1348,6 +1453,12 @@ var require_actions = __commonJS({
       }
       const notice = saved.updated ? t("service.updated", { name: saved.name }) : t("service.added", { name: saved.name });
       api2?.log?.info?.(`[account-switcher] added account snapshot ${saved.name} without touching live session`);
+      try {
+        await refreshUsageForSavedAccount(saved.name, api2, { allowLiveFallback: false });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        api2?.log?.warn?.(`[account-switcher] usage fetch failed for new account ${saved.name}: ${message}`);
+      }
       return readState({ notice, requiresAppRelaunch: false });
     }
     async function relaunchCodex(api) {
@@ -1374,9 +1485,9 @@ var require_actions = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/account/service.js
+// src/account/service.js
 var require_service = __commonJS({
-  "codex-plusplus-account-switcher/src/account/service.js"(exports2, module2) {
+  "src/account/service.js"(exports2, module2) {
     var { ok, fail, errorMessage, stringifyError } = require_utils();
     var {
       clearActiveAuth: clearActiveAuth2,
@@ -1418,9 +1529,9 @@ var require_service = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/dom-utils.js
+// src/dom-utils.js
 var require_dom_utils = __commonJS({
-  "codex-plusplus-account-switcher/src/dom-utils.js"(exports2, module2) {
+  "src/dom-utils.js"(exports2, module2) {
     function compactText(element) {
       return (element?.textContent || "").replace(/\s+/g, " ").trim();
     }
@@ -1460,9 +1571,9 @@ var require_dom_utils = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/ipc.js
+// src/ipc.js
 var require_ipc = __commonJS({
-  "codex-plusplus-account-switcher/src/ipc.js"(exports2, module2) {
+  "src/ipc.js"(exports2, module2) {
     var { IPC_CHANNEL: IPC_CHANNEL2 } = require_constants();
     async function invoke(state, action, payload = {}) {
       const result = await state.api.ipc.invoke(IPC_CHANNEL2, { ...payload, action });
@@ -1474,9 +1585,9 @@ var require_ipc = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/ui-components.js
+// src/ui-components.js
 var require_ui_components = __commonJS({
-  "codex-plusplus-account-switcher/src/ui-components.js"(exports2, module2) {
+  "src/ui-components.js"(exports2, module2) {
     var { protectInteractiveControl } = require_dom_utils();
     function addButtonFeedback(element, styles) {
       const normal = {
@@ -1636,9 +1747,9 @@ var require_ui_components = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/ui-profile-menu.js
+// src/ui-profile-menu.js
 var require_ui_profile_menu = __commonJS({
-  "codex-plusplus-account-switcher/src/ui-profile-menu.js"(exports2, module2) {
+  "src/ui-profile-menu.js"(exports2, module2) {
     var { compactText, isVisible, protectInteractiveControl } = require_dom_utils();
     var { invoke } = require_ipc();
     var { t: t2 } = require_i18n();
@@ -2186,9 +2297,9 @@ var require_ui_profile_menu = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/ui-settings.js
+// src/ui-settings.js
 var require_ui_settings = __commonJS({
-  "codex-plusplus-account-switcher/src/ui-settings.js"(exports2, module2) {
+  "src/ui-settings.js"(exports2, module2) {
     var { errorMessage } = require_utils();
     var { invoke } = require_ipc();
     var { t: t2 } = require_i18n();
@@ -2536,9 +2647,9 @@ var require_ui_settings = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/ui-sidebar.js
+// src/ui-sidebar.js
 var require_ui_sidebar = __commonJS({
-  "codex-plusplus-account-switcher/src/ui-sidebar.js"(exports2, module2) {
+  "src/ui-sidebar.js"(exports2, module2) {
     var { compactText, isVisible } = require_dom_utils();
     var { renderAccountsPage } = require_ui_settings();
     var SHORTCUT_ATTR = "data-codexpp-account-switch-shortcut";
@@ -2781,9 +2892,9 @@ var require_ui_sidebar = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/ui-failover.js
+// src/ui-failover.js
 var require_ui_failover = __commonJS({
-  "codex-plusplus-account-switcher/src/ui-failover.js"(exports2, module2) {
+  "src/ui-failover.js"(exports2, module2) {
     var { invoke } = require_ipc();
     var { refreshProfileMenu } = require_ui_profile_menu();
     var { errorMessage } = require_utils();
@@ -2835,9 +2946,9 @@ var require_ui_failover = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/src/renderer.js
+// src/renderer.js
 var require_renderer = __commonJS({
-  "codex-plusplus-account-switcher/src/renderer.js"(exports2, module2) {
+  "src/renderer.js"(exports2, module2) {
     var { mountAccountSwitchShortcut } = require_ui_sidebar();
     var { mountProfileMenu } = require_ui_profile_menu();
     var { mountFailoverWatch } = require_ui_failover();
@@ -2850,7 +2961,7 @@ var require_renderer = __commonJS({
   }
 });
 
-// codex-plusplus-account-switcher/index.js
+// index.js
 var { GLOBAL_SERVICE_KEY, IPC_HANDLER_KEY, IPC_CHANNEL } = require_constants();
 var { createAccountService } = require_service();
 var { startRenderer } = require_renderer();

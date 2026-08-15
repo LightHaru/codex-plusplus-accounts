@@ -12,8 +12,9 @@ function authWithEmail(email, extra = {}) {
     ...extra,
     tokens: {
       id_token: `${header}.${payload}.`,
-      access_token: "access",
+      access_token: extra.accessToken || "access",
       refresh_token: "refresh",
+      account_id: extra.accountId,
     },
   });
 }
@@ -469,6 +470,56 @@ test("switch copies auth without requiring an app relaunch", async () => {
     assert.equal(result.state.notice, "Switched to work.");
     assert.equal(await fs.readFile(path.join(codexDir, "auth.json"), "utf8"), work);
     assert.equal((await fs.readFile(path.join(codexDir, "current_account"), "utf8")).trim(), "work");
+  });
+});
+
+test("refresh-usage stores a distinct reset time per saved account", async () => {
+  await withTempHome(async (home) => {
+    const codexDir = path.join(home, ".codex");
+    const accountsDir = path.join(codexDir, "auth_accounts");
+    await fs.mkdir(accountsDir, { recursive: true });
+    await fs.writeFile(
+      path.join(accountsDir, "work.json"),
+      authWithEmail("work@example.com", { accessToken: "tok-work" }),
+    );
+    await fs.writeFile(
+      path.join(accountsDir, "personal.json"),
+      authWithEmail("me@example.com", { accessToken: "tok-personal" }),
+    );
+    await fs.writeFile(path.join(codexDir, "auth.json"), authWithEmail("work@example.com", { accessToken: "tok-work" }));
+    await fs.writeFile(path.join(codexDir, "current_account"), "work\n");
+
+    const { createAccountService } = require("../src/account/service");
+    const service = createAccountService({
+      log: { info() {}, warn() {} },
+      fetchUsageWithAuth: async (auth) => {
+        const token = auth?.tokens?.access_token;
+        if (token === "tok-work") {
+          return {
+            fiveHour: { label: "5h", pct: 0, resetAt: "18:06 Thứ 5, 20/08/2026" },
+            weekly: { label: "Weekly", pct: 0, resetAt: "18:06 Thứ 5, 20/08/2026" },
+            at: 1777729000000,
+          };
+        }
+        if (token === "tok-personal") {
+          return {
+            fiveHour: { label: "5h", pct: 12, resetAt: "19:39 Thứ 5, 20/08/2026" },
+            weekly: { label: "Weekly", pct: 40, resetAt: "19:39 Thứ 5, 20/08/2026" },
+            at: 1777729000000,
+          };
+        }
+        throw new Error(`unexpected token ${token}`);
+      },
+    });
+    const result = await service.handle({ action: "refresh-usage" });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.state.accountUsage.work.weekly.resetAt, "18:06 Thứ 5, 20/08/2026");
+    assert.equal(result.state.accountUsage.personal.weekly.resetAt, "19:39 Thứ 5, 20/08/2026");
+    assert.notEqual(
+      result.state.accountUsage.work.weekly.resetAt,
+      result.state.accountUsage.personal.weekly.resetAt,
+    );
   });
 });
 

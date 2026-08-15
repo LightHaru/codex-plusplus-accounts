@@ -9,7 +9,7 @@ const {
 } = require("../node-utils");
 const { readState } = require("./state");
 const { getCurrentAccountName, listAccountNames } = require("./storage");
-const { fetchActiveUsageSnapshot, writeAccountUsage } = require("./usage");
+const { fetchActiveUsageSnapshot, fetchUsageSnapshotForAuth, writeAccountUsage } = require("./usage");
 const {
   readAuthJson,
   saveAuthSnapshotWithCurrentBaseUrl,
@@ -76,8 +76,14 @@ async function nudgeLiveSessionAfterSwitch(api, name) {
   }
 
   try {
-    const snapshot = await fetchActiveUsageSnapshot(api);
-    await writeAccountUsage(name, snapshot);
+    await fetchActiveUsageSnapshot(api);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    api?.log?.warn?.(`[account-switcher] post-switch live usage nudge failed: ${message}`);
+  }
+
+  try {
+    await refreshUsageForSavedAccount(name, api, { allowLiveFallback: true });
     api?.log?.info?.(`[account-switcher] post-switch usage fetch succeeded for ${name}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -134,12 +140,37 @@ async function clearActiveAuth(api) {
   });
 }
 
-async function refreshActiveUsage(api) {
+async function refreshUsageForSavedAccount(name, api, options = {}) {
+  const { allowLiveFallback = false } = options;
+  try {
+    const { readAuthJson } = require("./config");
+    const auth = await readAuthJson(accountPath(name), `Saved account ${name}`);
+    const snapshot = await fetchUsageSnapshotForAuth(auth, api);
+    await writeAccountUsage(name, snapshot);
+    return snapshot;
+  } catch (error) {
+    if (!allowLiveFallback) throw error;
+    const snapshot = await fetchActiveUsageSnapshot(api);
+    await writeAccountUsage(name, snapshot);
+    return snapshot;
+  }
+}
+
+async function refreshAllSavedAccountUsage(api) {
   const accounts = await listAccountNames();
   const current = await getCurrentAccountName(accounts);
-  if (!current) return readState();
-  const snapshot = await fetchActiveUsageSnapshot(api);
-  await writeAccountUsage(current, snapshot);
+  for (const name of accounts) {
+    try {
+      await refreshUsageForSavedAccount(name, api, { allowLiveFallback: name === current });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      api?.log?.warn?.(`[account-switcher] usage fetch failed for ${name}: ${message}`);
+    }
+  }
+}
+
+async function refreshActiveUsage(api) {
+  await refreshAllSavedAccountUsage(api);
   return maybeFailover(api);
 }
 
@@ -214,6 +245,12 @@ async function addAccountWithoutRelaunch(api) {
     ? t("service.updated", { name: saved.name })
     : t("service.added", { name: saved.name });
   api?.log?.info?.(`[account-switcher] added account snapshot ${saved.name} without touching live session`);
+  try {
+    await refreshUsageForSavedAccount(saved.name, api, { allowLiveFallback: false });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    api?.log?.warn?.(`[account-switcher] usage fetch failed for new account ${saved.name}: ${message}`);
+  }
   return readState({ notice, requiresAppRelaunch: false });
 }
 
