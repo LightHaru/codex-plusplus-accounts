@@ -2101,9 +2101,13 @@ var require_ui_profile_menu = __commonJS({
         block.appendChild(status);
       } else {
         block.appendChild(usageSummaryRow(accountState, accounts.length));
+        const list = document.createElement("div");
+        list.style.cssText = "display:flex;flex-direction:column;gap:2px;max-height:min(360px,50vh);overflow-y:auto;overscroll-behavior:contain;";
         for (const name of accounts) {
-          block.appendChild(profileAccountRow(state, name, accountState));
+          list.appendChild(profileAccountRow(state, name, accountState));
         }
+        list.addEventListener("wheel", (event) => event.stopPropagation());
+        block.appendChild(list);
         block.appendChild(addSubscriptionRow(state));
         block.appendChild(autoSwitchRow(state, accountState));
         if (accountState?.error) {

@@ -8,6 +8,12 @@ All notable changes to [Codex Accounts](https://github.com/LightHaru/codex-plusp
 
 # English
 
+## 2.5.5 — 2026-08-16
+
+Avatar popup account list scrolls when it gets long.
+
+- Account rows cap at about half the window height and scroll. Usage remaining, Add another subscription, and Auto-switch stay put.
+
 ## 2.5.4 — 2026-08-16
 
 Local privacy and snapshot hardening.
@@ -66,6 +72,12 @@ Initial public snapshot (then named Codex Avatar Switcher).
 ---
 
 # Tiếng Việt
+
+## 2.5.5 — 2026-08-16
+
+List acc trên popup avatar cuộn khi dài.
+
+- Hàng acc cao tối đa khoảng nửa cửa sổ rồi scroll. Usage remaining, Add another subscription, và Auto-switch đứng yên.
 
 ## 2.5.4 — 2026-08-16
 

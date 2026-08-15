@@ -1,7 +1,7 @@
 {
   "id": "me.lightharu.codex-accounts",
   "name": "Codex Accounts",
-  "version": "2.5.4",
+  "version": "2.5.5",
   "description": "Switch Codex ChatGPT accounts from the avatar menu without restarting. Add accounts in a separate login window. Auto-switch when quota runs out.",
   "githubRepo": "LightHaru/codex-plusplus-accounts",
   "homepage": "https://github.com/LightHaru/codex-plusplus-accounts",
