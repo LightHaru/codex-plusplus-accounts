@@ -7,6 +7,7 @@ const {
   listAccountNames,
 } = require("./storage");
 const { readAccountUsage } = require("./usage");
+const { readAutoswitchEnabled } = require("./settings");
 
 async function readState(extra = {}) {
   const { AUTH_PATH, ACCOUNTS_DIR, CONFIG_PATH, CURRENT_NAME_PATH } = codexAuthPaths();
@@ -25,11 +26,13 @@ async function readState(extra = {}) {
       .filter(([, profile]) => profile && Object.keys(profile).length),
   );
   const accountUsage = await readAccountUsage(accounts);
+  const autoswitchEnabled = await readAutoswitchEnabled();
   return {
     accounts,
     accountEmails,
     accountProfiles,
     accountUsage,
+    autoswitchEnabled,
     current,
     hasActiveAuth,
     paths: {

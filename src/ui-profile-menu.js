@@ -124,6 +124,7 @@ function renderProfileAccounts(state, popup, accountState, options = {}) {
       block.appendChild(profileAccountRow(state, name, accountState));
     }
     block.appendChild(addSubscriptionRow(state));
+    block.appendChild(autoSwitchRow(state, accountState));
     if (accountState?.error) {
       const error = document.createElement("div");
       error.style.cssText = "padding:4px 10px;font-size:11px;color:var(--color-token-text-error,#c2410c);";
@@ -190,22 +191,41 @@ function profileAccountRow(state, name, accountState) {
   button.disabled = isCurrent || !!state.profileMenuBusy;
   button.style.cssText =
     "width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;" +
-    "display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;";
-  if (isCurrent) button.style.background = "color-mix(in srgb, currentColor 6%, transparent)";
+    "display:flex;align-items:center;gap:10px;padding:8px 10px 8px 7px;border-radius:10px;cursor:pointer;" +
+    "box-sizing:border-box;border-left:3px solid transparent;";
+  if (isCurrent) {
+    button.style.background = "color-mix(in srgb, #14b8a6 16%, transparent)";
+    button.style.borderLeftColor = "#14b8a6";
+    button.style.cursor = "default";
+  }
 
+  const avatarWrap = document.createElement("div");
+  avatarWrap.style.cssText = "position:relative;width:28px;height:28px;flex-shrink:0;";
   const avatar = document.createElement("div");
   avatar.setAttribute("aria-hidden", "true");
   const color = isCurrent ? "#14b8a6" : avatarColor(name);
   avatar.style.cssText =
-    `width:28px;height:28px;border-radius:999px;flex-shrink:0;display:flex;align-items:center;justify-content:center;` +
+    `width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;` +
     `font-size:11px;font-weight:600;color:#fff;background:${color};`;
   avatar.textContent = initials(displayName);
+  avatarWrap.appendChild(avatar);
+  if (isCurrent) {
+    const check = document.createElement("div");
+    check.setAttribute("aria-hidden", "true");
+    check.style.cssText =
+      "position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border-radius:999px;" +
+      "background:#14b8a6;color:#042f2e;display:flex;align-items:center;justify-content:center;" +
+      "box-shadow:0 0 0 2px var(--color-token-main-surface-primary, #202020);";
+    check.innerHTML =
+      '<svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.2 6.2l2.4 2.4 5.2-5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    avatarWrap.appendChild(check);
+  }
 
   const copy = document.createElement("div");
   copy.style.cssText = "min-width:0;flex:1;display:flex;flex-direction:column;gap:2px;";
   const title = document.createElement("div");
   title.style.cssText = "font-size:14px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-  title.textContent = isCurrent ? `${t("profile.primary")} · ${plan}` : `${displayName} · ${plan}`;
+  title.textContent = `${displayName} · ${plan}`;
   title.title = displayName;
   const dots = document.createElement("div");
   dots.style.cssText = "font-size:11px;letter-spacing:1.5px;color:var(--color-token-text-secondary,currentColor);opacity:0.7;";
@@ -220,24 +240,40 @@ function profileAccountRow(state, name, accountState) {
     copy.appendChild(reset);
   }
 
+  const right = document.createElement("div");
+  right.style.cssText = "flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:52px;";
+  if (isCurrent) {
+    const badge = document.createElement("span");
+    badge.textContent = t("accounts.current");
+    badge.style.cssText =
+      "font-size:10px;font-weight:700;letter-spacing:0.04em;line-height:16px;padding:1px 7px;" +
+      "border-radius:999px;background:#14b8a6;color:#042f2e;text-transform:uppercase;";
+    right.appendChild(badge);
+  }
   const value = document.createElement("div");
   value.style.cssText = "font-size:14px;line-height:18px;font-variant-numeric:tabular-nums;color:var(--color-token-text-primary,currentColor);";
   value.textContent = pct == null ? "—" : `${pct}%`;
+  right.appendChild(value);
 
-  button.append(avatar, copy, value);
+  button.append(avatarWrap, copy, right);
   protectInteractiveControl(button);
   button.addEventListener("pointerenter", () => {
-    if (button.disabled) return;
+    if (button.disabled && !isCurrent) return;
+    if (isCurrent) {
+      button.style.background = "color-mix(in srgb, #14b8a6 22%, transparent)";
+      return;
+    }
     button.style.background = "color-mix(in srgb, currentColor 10%, transparent)";
   });
   button.addEventListener("pointerleave", () => {
-    button.style.background = isCurrent ? "color-mix(in srgb, currentColor 6%, transparent)" : "transparent";
+    button.style.background = isCurrent ? "color-mix(in srgb, #14b8a6 16%, transparent)" : "transparent";
   });
   if (!isCurrent) {
     bindButtonAction(button, () => switchFromProfileMenu(state, name, displayName));
   }
   return button;
 }
+
 
 function addSubscriptionRow(state) {
   const button = document.createElement("button");
@@ -266,17 +302,82 @@ function addSubscriptionRow(state) {
   return button;
 }
 
+function autoSwitchRow(state, accountState) {
+  const enabled = accountState?.autoswitchEnabled !== false;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.setAttribute("data-codexpp-profile-autoswitch", "true");
+  button.setAttribute("aria-pressed", enabled ? "true" : "false");
+  button.style.cssText =
+    "width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;" +
+    "display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;";
+  const icon = document.createElement("div");
+  icon.setAttribute("aria-hidden", "true");
+  icon.style.cssText =
+    "width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:0.85;";
+  icon.textContent = enabled ? "↻" : "○";
+  const copy = document.createElement("div");
+  copy.style.cssText = "min-width:0;flex:1;font-size:14px;line-height:18px;";
+  copy.textContent = t("profile.autoSwitch");
+  const badge = document.createElement("span");
+  badge.textContent = enabled ? t("profile.autoSwitchOn") : t("profile.autoSwitchOff");
+  badge.style.cssText =
+    "flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:0.04em;line-height:16px;padding:1px 7px;" +
+    "border-radius:999px;" +
+    (enabled
+      ? "background:#14b8a6;color:#042f2e;"
+      : "background:color-mix(in srgb, currentColor 12%, transparent);color:inherit;");
+  button.append(icon, copy, badge);
+  protectInteractiveControl(button);
+  button.addEventListener("pointerenter", () => {
+    button.style.background = "color-mix(in srgb, currentColor 10%, transparent)";
+  });
+  button.addEventListener("pointerleave", () => {
+    button.style.background = "transparent";
+  });
+  bindButtonAction(button, async () => {
+    try {
+      const next = await invoke(state, "set-autoswitch", { enabled: !enabled });
+      refreshProfileMenu(state, next);
+    } catch (error) {
+      state.api.log.warn("[account-switcher] toggle autoswitch failed", errorMessage(error));
+    }
+  });
+  return button;
+}
+
 async function addAccountFromProfileMenu(state) {
   if (state.profileMenuBusy) return;
-  const ok = window.confirm(`${t("accounts.confirmTitle")}\n\n${t("accounts.confirmMessage")}`);
-  if (!ok) return;
   state.profileMenuBusy = true;
+  const popup = findProfilePopup();
+  const addBtn = popup?.querySelector("[data-codexpp-profile-add]");
+  const label = addBtn?.querySelector("div:last-child");
+  const previous = label?.textContent;
+  if (addBtn) addBtn.disabled = true;
+  if (label) label.textContent = t("profile.signingIn");
   try {
-    await invoke(state, "clear-active");
-    await invoke(state, "relaunch");
+    const accountState = await invoke(state, "add-account");
+    state.api.log.info("[account-switcher] added account without relaunch");
+    refreshProfileMenu(state, accountState);
+    if (state.directPage?.sections?.isConnected) {
+      const { renderAccountsPageState } = require("./ui-settings");
+      renderAccountsPageState(state, state.directPage.sections, accountState);
+    }
   } catch (error) {
-    state.api.log.warn("[account-switcher] add account failed", errorMessage(error));
+    const message = errorMessage(error);
+    state.api.log.warn("[account-switcher] add account failed", message);
+    const open = findProfilePopup();
+    if (open) {
+      const cancelled = /cancel/i.test(message);
+      renderProfileAccounts(state, open, {
+        ...(state.lastState || { accounts: [] }),
+        error: cancelled ? t("profile.addCancelled") : t("profile.addFailed", { error: message }),
+      });
+    }
+  } finally {
     state.profileMenuBusy = false;
+    if (label && previous) label.textContent = previous;
+    if (addBtn) addBtn.disabled = false;
   }
 }
 
@@ -519,7 +620,7 @@ function firstStockAnchor(popup) {
 function profileFingerprint(accountState) {
   if (!accountState) return "";
   const accounts = Array.isArray(accountState.accounts) ? accountState.accounts.join(",") : "";
-  return `${accounts}|${accountState.current || ""}|${accountState.error || ""}`;
+  return `${accounts}|${accountState.current || ""}|${accountState.error || ""}|${accountState.autoswitchEnabled ? 1 : 0}`;
 }
 
 function normalizeLabel(label) {

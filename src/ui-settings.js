@@ -43,8 +43,13 @@ function renderHeaderActions(state, root) {
     borderRadius: "10px",
     fontSize: "12px",
   });
-  bindButtonAction(add, () => showAddAccountConfirmation(state, root, add));
+  bindButtonAction(add, () => addAccountFromSettings(state, root));
   actions.append(refresh, add);
+}
+
+
+function addAccountFromSettings(state, root) {
+  runAccountAction(state, root, "add-account", {}, t("profile.signingIn"));
 }
 
 function showAddAccountConfirmation(state, root, trigger) {

@@ -140,7 +140,81 @@ async function refreshActiveUsage(api) {
   if (!current) return readState();
   const snapshot = await fetchActiveUsageSnapshot(api);
   await writeAccountUsage(current, snapshot);
-  return readState();
+  return maybeFailover(api);
+}
+
+let failoverBusy = false;
+
+async function maybeFailover(api) {
+  const { readAutoswitchEnabled } = require("./settings");
+  const { isUsageExhausted, pickFailoverAccount } = require("./failover");
+  if (failoverBusy) return readState();
+  if (!(await readAutoswitchEnabled())) return readState();
+
+  failoverBusy = true;
+  try {
+    let state = await readState();
+    const visited = new Set();
+    let from = state.current;
+    while (state.current && isUsageExhausted(state.accountUsage?.[state.current])) {
+      if (visited.has(state.current)) break;
+      visited.add(state.current);
+      const next = pickFailoverAccount(
+        state.current,
+        state.accounts,
+        state.accountUsage,
+        visited,
+      );
+      if (!next) break;
+      api?.log?.info?.(
+        `[account-switcher] quota empty on ${state.current}; auto-switching to ${next}`,
+      );
+      state = await switchAccount(next, api);
+      from = from || state.current;
+    }
+    if (visited.size && state.current && !visited.has(state.current)) {
+      return {
+        ...state,
+        notice: t("service.autoSwitched", { from: [...visited][0], to: state.current }),
+        autoSwitched: true,
+      };
+    }
+    return state;
+  } finally {
+    failoverBusy = false;
+  }
+}
+
+async function setAutoswitchEnabled(enabled) {
+  const { writeAutoswitchEnabled } = require("./settings");
+  const value = await writeAutoswitchEnabled(enabled);
+  return readState({ notice: value ? t("profile.autoSwitchOn") : t("profile.autoSwitchOff") });
+}
+
+
+async function addAccountWithoutRelaunch(api) {
+  const { ensureAutosavedActiveAccount } = require("./storage");
+  const { runChatGptLogin, saveIncomingAccount } = require("./login");
+  const { fsp } = nodeDeps();
+  const { AUTH_PATH } = codexAuthPaths();
+  const liveBefore = await pathExists(AUTH_PATH)
+    ? await fsp.readFile(AUTH_PATH, "utf8")
+    : null;
+  await ensureAutosavedActiveAccount();
+  const auth = await runChatGptLogin(api);
+  const saved = await saveIncomingAccount(auth);
+  if (liveBefore != null) {
+    const liveAfter = await fsp.readFile(AUTH_PATH, "utf8");
+    if (liveAfter !== liveBefore) {
+      await fsp.writeFile(AUTH_PATH, liveBefore, "utf8");
+      api?.log?.warn?.("[account-switcher] restored live auth.json after add-account");
+    }
+  }
+  const notice = saved.updated
+    ? t("service.updated", { name: saved.name })
+    : t("service.added", { name: saved.name });
+  api?.log?.info?.(`[account-switcher] added account snapshot ${saved.name} without touching live session`);
+  return readState({ notice, requiresAppRelaunch: false });
 }
 
 async function relaunchCodex(api) {
@@ -161,4 +235,7 @@ module.exports = {
   clearActiveAuth,
   refreshActiveUsage,
   relaunchCodex,
+  addAccountWithoutRelaunch,
+  maybeFailover,
+  setAutoswitchEnabled,
 };

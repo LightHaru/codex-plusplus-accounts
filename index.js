@@ -1,5 +1,5 @@
 /**
- * Account Switcher
+ * Codex Accounts
  *
  * Codex++ tweak that switches saved Codex sessions from the native avatar
  * menu (sidebar Accounts page remains as fallback). Main process owns all

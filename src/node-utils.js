@@ -19,6 +19,7 @@ function codexAuthPaths() {
     ACCOUNTS_DIR: path.join(CODEX_DIR, "auth_accounts"),
     USAGE_CACHE_PATH: path.join(CODEX_DIR, "auth_accounts_usage.json"),
     CURRENT_NAME_PATH: path.join(CODEX_DIR, "current_account"),
+    AUTOSWITCH_PATH: path.join(CODEX_DIR, "auth_accounts_autoswitch.json"),
   };
 }
 

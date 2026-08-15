@@ -7,9 +7,9 @@ var __commonJS = (cb, mod) => function __require() {
   }
 };
 
-// src/constants.js
+// codex-plusplus-account-switcher/src/constants.js
 var require_constants = __commonJS({
-  "src/constants.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/constants.js"(exports2, module2) {
     var GLOBAL_SERVICE_KEY2 = "__codexpp_account_switcher_service__";
     var IPC_HANDLER_KEY2 = "__codexpp_account_switcher_ipc_handler__";
     var IPC_CHANNEL2 = "account-switcher";
@@ -18,9 +18,9 @@ var require_constants = __commonJS({
   }
 });
 
-// src/utils.js
+// codex-plusplus-account-switcher/src/utils.js
 var require_utils = __commonJS({
-  "src/utils.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/utils.js"(exports2, module2) {
     function ok(state) {
       return { ok: true, state };
     }
@@ -37,21 +37,21 @@ var require_utils = __commonJS({
   }
 });
 
-// src/i18n.js
+// codex-plusplus-account-switcher/src/i18n.js
 var require_i18n = __commonJS({
-  "src/i18n.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/i18n.js"(exports2, module2) {
     var STRINGS = {
       "accounts.loading": "Loading saved accounts...",
       "accounts.refresh": "Refresh accounts",
       "accounts.add": "Add account",
       "accounts.confirmTitle": "Add another account?",
-      "accounts.confirmMessage": "Codex will log out of the current account and restart. After it reopens, you can sign in with another account.",
+      "accounts.confirmMessage": "A sign-in window will open. The account you are using stays logged in.",
       "accounts.cancel": "Cancel",
-      "accounts.confirmAdd": "Log out and restart",
+      "accounts.confirmAdd": "Continue",
       "accounts.saved": "Saved accounts",
       "accounts.noSaved": "No saved accounts",
       "accounts.noSession": "No active session",
-      "accounts.addHint": "Add an account to start switching between sessions.",
+      "accounts.addHint": "Add an account from a sign-in window. The current session stays open.",
       "accounts.current": "Current",
       "accounts.currentSession": "Current session",
       "accounts.usageUnavailable": "Usage not checked",
@@ -76,9 +76,18 @@ var require_i18n = __commonJS({
       "profile.primary": "Primary",
       "profile.switching": "Switching...",
       "profile.switchTo": "Switch to {name}",
+      "profile.signingIn": "Sign in to add an account...",
+      "profile.addCancelled": "Sign-in cancelled.",
+      "profile.addFailed": "Could not add account: {error}",
       "profile.switchFailed": "Could not switch: {error}",
+      "profile.autoSwitch": "Auto-switch when quota runs out",
+      "profile.autoSwitchOn": "On",
+      "profile.autoSwitchOff": "Off",
+      "service.added": "Added {name}. Current account is unchanged.",
+      "service.updated": "Updated saved account {name}. Current account is unchanged.",
       "service.saved": "Saved current account as {name}.",
       "service.switched": "Switched to {name}.",
+      "service.autoSwitched": "Quota empty on {from}. Switched to {to}.",
       "service.removed": "Removed saved account {name}.",
       "service.sessionCleared": "Session cleared. Relaunching Codex for sign-in.",
       "service.relaunching": "Relaunching Codex..."
@@ -93,9 +102,9 @@ var require_i18n = __commonJS({
   }
 });
 
-// src/node-utils.js
+// codex-plusplus-account-switcher/src/node-utils.js
 var require_node_utils = __commonJS({
-  "src/node-utils.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/node-utils.js"(exports2, module2) {
     var { ACCOUNT_NAME_PATTERN } = require_constants();
     function nodeDeps2() {
       return {
@@ -114,7 +123,8 @@ var require_node_utils = __commonJS({
         CONFIG_PATH: path.join(CODEX_DIR, "config.toml"),
         ACCOUNTS_DIR: path.join(CODEX_DIR, "auth_accounts"),
         USAGE_CACHE_PATH: path.join(CODEX_DIR, "auth_accounts_usage.json"),
-        CURRENT_NAME_PATH: path.join(CODEX_DIR, "current_account")
+        CURRENT_NAME_PATH: path.join(CODEX_DIR, "current_account"),
+        AUTOSWITCH_PATH: path.join(CODEX_DIR, "auth_accounts_autoswitch.json")
       };
     }
     function normalizeAccountName2(rawName) {
@@ -149,9 +159,9 @@ var require_node_utils = __commonJS({
   }
 });
 
-// src/account/auth.js
+// codex-plusplus-account-switcher/src/account/auth.js
 var require_auth = __commonJS({
-  "src/account/auth.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/account/auth.js"(exports2, module2) {
     function emailFromAuthString(raw) {
       try {
         return emailFromAuth(JSON.parse(raw));
@@ -160,16 +170,16 @@ var require_auth = __commonJS({
       }
     }
     function emailFromAuth(auth) {
-      return profileFromAuth(auth).email || null;
+      return profileFromAuth2(auth).email || null;
     }
     function profileFromAuthString(raw) {
       try {
-        return profileFromAuth(JSON.parse(raw));
+        return profileFromAuth2(JSON.parse(raw));
       } catch {
         return {};
       }
     }
-    function profileFromAuth(auth) {
+    function profileFromAuth2(auth) {
       const direct = auth?.email || auth?.user?.email || auth?.account?.email;
       const profile = {};
       if (typeof direct === "string" && direct.includes("@")) profile.email = direct;
@@ -201,13 +211,13 @@ var require_auth = __commonJS({
         return profile;
       }
     }
-    module2.exports = { emailFromAuthString, emailFromAuth, profileFromAuthString, profileFromAuth };
+    module2.exports = { emailFromAuthString, emailFromAuth, profileFromAuthString, profileFromAuth: profileFromAuth2 };
   }
 });
 
-// src/account/storage.js
+// codex-plusplus-account-switcher/src/account/storage.js
 var require_storage = __commonJS({
-  "src/account/storage.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/account/storage.js"(exports2, module2) {
     var {
       nodeDeps: nodeDeps2,
       codexAuthPaths: codexAuthPaths2,
@@ -290,7 +300,7 @@ var require_storage = __commonJS({
         return matched;
       }
       const active = await fsp.readFile(AUTH_PATH, "utf8");
-      const sameEmail = await findMatchingAccountByEmail(accounts, active);
+      const sameEmail = await findMatchingAccountByEmail2(accounts, active);
       if (sameEmail) {
         await fsp.copyFile(AUTH_PATH, accountPath2(sameEmail));
         await fsp.writeFile(CURRENT_NAME_PATH, `${sameEmail}
@@ -298,13 +308,13 @@ var require_storage = __commonJS({
         return sameEmail;
       }
       await ensureDir2(ACCOUNTS_DIR);
-      const name = await nextAvailableAccountName("account");
+      const name = await nextAvailableAccountName2("account");
       await fsp.copyFile(AUTH_PATH, accountPath2(name));
       await fsp.writeFile(CURRENT_NAME_PATH, `${name}
 `, "utf8");
       return name;
     }
-    async function findMatchingAccountByEmail(accounts, activeContents) {
+    async function findMatchingAccountByEmail2(accounts, activeContents) {
       const activeEmail = emailFromAuthString(activeContents)?.toLowerCase();
       if (!activeEmail) return null;
       const { fsp } = nodeDeps2();
@@ -336,7 +346,7 @@ var require_storage = __commonJS({
       });
       return matches[0]?.name || null;
     }
-    async function nextAvailableAccountName(baseName) {
+    async function nextAvailableAccountName2(baseName) {
       const accounts = new Set(await listAccountNames2());
       if (!accounts.has(baseName)) return baseName;
       for (let index = 2; index < 1e4; index += 1) {
@@ -349,17 +359,17 @@ var require_storage = __commonJS({
       listAccountNames: listAccountNames2,
       getCurrentAccountName: getCurrentAccountName2,
       findMatchingAccountByContents,
-      findMatchingAccountByEmail,
+      findMatchingAccountByEmail: findMatchingAccountByEmail2,
       accountContentsMatchActive,
       ensureAutosavedActiveAccount,
-      nextAvailableAccountName
+      nextAvailableAccountName: nextAvailableAccountName2
     };
   }
 });
 
-// src/account/usage.js
+// codex-plusplus-account-switcher/src/account/usage.js
 var require_usage = __commonJS({
-  "src/account/usage.js"(exports, module) {
+  "codex-plusplus-account-switcher/src/account/usage.js"(exports, module) {
     var { nodeDeps, codexAuthPaths, ensureDir } = require_node_utils();
     async function readAccountUsage(accounts) {
       const { fsp } = nodeDeps();
@@ -560,9 +570,39 @@ var require_usage = __commonJS({
   }
 });
 
-// src/account/state.js
+// codex-plusplus-account-switcher/src/account/settings.js
+var require_settings = __commonJS({
+  "codex-plusplus-account-switcher/src/account/settings.js"(exports2, module2) {
+    var { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, ensureDir: ensureDir2 } = require_node_utils();
+    async function readAutoswitchEnabled() {
+      const { fsp } = nodeDeps2();
+      const { AUTOSWITCH_PATH } = codexAuthPaths2();
+      try {
+        const raw = JSON.parse(await fsp.readFile(AUTOSWITCH_PATH, "utf8"));
+        if (raw && typeof raw.enabled === "boolean") return raw.enabled;
+      } catch {
+      }
+      return true;
+    }
+    async function writeAutoswitchEnabled(enabled) {
+      const { fsp } = nodeDeps2();
+      const { CODEX_DIR, AUTOSWITCH_PATH } = codexAuthPaths2();
+      await ensureDir2(CODEX_DIR);
+      await fsp.writeFile(
+        AUTOSWITCH_PATH,
+        `${JSON.stringify({ enabled: Boolean(enabled) }, null, 2)}
+`,
+        "utf8"
+      );
+      return Boolean(enabled);
+    }
+    module2.exports = { readAutoswitchEnabled, writeAutoswitchEnabled };
+  }
+});
+
+// codex-plusplus-account-switcher/src/account/state.js
 var require_state = __commonJS({
-  "src/account/state.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/account/state.js"(exports2, module2) {
     var { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, accountPath: accountPath2, pathExists: pathExists2 } = require_node_utils();
     var { profileFromAuthString } = require_auth();
     var {
@@ -572,6 +612,7 @@ var require_state = __commonJS({
       listAccountNames: listAccountNames2
     } = require_storage();
     var { readAccountUsage: readAccountUsage2 } = require_usage();
+    var { readAutoswitchEnabled } = require_settings();
     async function readState2(extra = {}) {
       const { AUTH_PATH, ACCOUNTS_DIR, CONFIG_PATH, CURRENT_NAME_PATH } = codexAuthPaths2();
       await ensureAutosavedActiveAccount();
@@ -587,11 +628,13 @@ var require_state = __commonJS({
         visibleAccounts.map(({ name, profile }) => [name, profile]).filter(([, profile]) => profile && Object.keys(profile).length)
       );
       const accountUsage = await readAccountUsage2(accounts);
+      const autoswitchEnabled = await readAutoswitchEnabled();
       return {
         accounts,
         accountEmails,
         accountProfiles,
         accountUsage,
+        autoswitchEnabled,
         current,
         hasActiveAuth,
         paths: {
@@ -649,9 +692,9 @@ var require_state = __commonJS({
   }
 });
 
-// src/account/config.js
+// codex-plusplus-account-switcher/src/account/config.js
 var require_config = __commonJS({
-  "src/account/config.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/account/config.js"(exports2, module2) {
     var { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, ensureDir: ensureDir2 } = require_node_utils();
     async function saveAuthSnapshotWithCurrentBaseUrl2(sourcePath, targetPath) {
       const { fsp } = nodeDeps2();
@@ -771,9 +814,350 @@ var require_config = __commonJS({
   }
 });
 
-// src/account/actions.js
+// codex-plusplus-account-switcher/src/account/failover.js
+var require_failover = __commonJS({
+  "codex-plusplus-account-switcher/src/account/failover.js"(exports2, module2) {
+    function windowPct(usage, key) {
+      const pct = usage?.[key]?.pct;
+      return typeof pct === "number" && Number.isFinite(pct) ? pct : null;
+    }
+    function isUsageExhausted(usage) {
+      if (!usage) return false;
+      const weekly = windowPct(usage, "weekly");
+      const five = windowPct(usage, "fiveHour");
+      if (weekly === 0) return true;
+      if (five === 0) return true;
+      return false;
+    }
+    function remainingScore(usage) {
+      if (!usage || isUsageExhausted(usage)) return 0;
+      const weekly = windowPct(usage, "weekly");
+      const five = windowPct(usage, "fiveHour");
+      if (weekly == null && five == null) return 0;
+      if (weekly == null) return five;
+      if (five == null) return weekly;
+      return Math.min(weekly, five);
+    }
+    function hasUsageRemaining(usage) {
+      return remainingScore(usage) > 0;
+    }
+    function pickFailoverAccount(current, accounts, accountUsage, visited = /* @__PURE__ */ new Set()) {
+      if (!isUsageExhausted(accountUsage?.[current])) return null;
+      const names = Array.isArray(accounts) ? accounts : [];
+      const candidates2 = names.filter((name) => {
+        if (!name || name === current) return false;
+        if (visited.has(name)) return false;
+        return hasUsageRemaining(accountUsage?.[name]);
+      });
+      candidates2.sort((a, b) => {
+        const diff = remainingScore(accountUsage[b]) - remainingScore(accountUsage[a]);
+        if (diff) return diff;
+        return a.localeCompare(b, void 0, { sensitivity: "base" });
+      });
+      return candidates2[0] || null;
+    }
+    module2.exports = {
+      isUsageExhausted,
+      hasUsageRemaining,
+      remainingScore,
+      pickFailoverAccount
+    };
+  }
+});
+
+// codex-plusplus-account-switcher/src/account/login.js
+var require_login = __commonJS({
+  "codex-plusplus-account-switcher/src/account/login.js"(exports, module) {
+    var crypto = require("node:crypto");
+    var https = require("node:https");
+    var { profileFromAuth } = require_auth();
+    var { nodeDeps, accountPath, ensureDir } = require_node_utils();
+    var {
+      nextAvailableAccountName,
+      findMatchingAccountByEmail,
+      listAccountNames
+    } = require_storage();
+    var CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
+    var ISSUER = "https://auth.openai.com";
+    var REDIRECT_URI = "http://localhost:1455/auth/callback";
+    var SCOPE = "openid profile email offline_access api.connectors.read api.connectors.invoke";
+    var ORIGINATOR = "codex_cli_rs";
+    var PARTITION = "persist:codexpp-add-account";
+    var LOGIN_TIMEOUT_MS = 5 * 60 * 1e3;
+    var inflight = null;
+    function electron() {
+      const electronRequire = eval("require");
+      return electronRequire("electron");
+    }
+    function base64url(buffer) {
+      return Buffer.from(buffer).toString("base64url");
+    }
+    function generatePkce() {
+      const verifier = base64url(crypto.randomBytes(32));
+      const challenge = base64url(crypto.createHash("sha256").update(verifier).digest());
+      return { verifier, challenge };
+    }
+    function generateState() {
+      return base64url(crypto.randomBytes(32));
+    }
+    function buildAuthorizeUrl(challenge, state) {
+      const query = new URLSearchParams({
+        response_type: "code",
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        scope: SCOPE,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        id_token_add_organizations: "true",
+        codex_cli_simplified_flow: "true",
+        state,
+        originator: ORIGINATOR
+      });
+      return `${ISSUER}/oauth/authorize?${query.toString()}`;
+    }
+    function isCallbackUrl(url) {
+      return typeof url === "string" && url.startsWith(REDIRECT_URI);
+    }
+    function parseCallback(url) {
+      const parsed = new URL(url);
+      return {
+        code: parsed.searchParams.get("code") || "",
+        state: parsed.searchParams.get("state") || "",
+        error: parsed.searchParams.get("error") || "",
+        errorDescription: parsed.searchParams.get("error_description") || ""
+      };
+    }
+    function postForm(pathname, fields) {
+      const body = new URLSearchParams(fields).toString();
+      return new Promise((resolve, reject) => {
+        const req = https.request(
+          {
+            hostname: "auth.openai.com",
+            path: pathname,
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Content-Length": Buffer.byteLength(body)
+            }
+          },
+          (res) => {
+            const chunks = [];
+            res.on("data", (chunk) => chunks.push(chunk));
+            res.on("end", () => {
+              resolve({
+                status: res.statusCode || 0,
+                body: Buffer.concat(chunks).toString("utf8")
+              });
+            });
+          }
+        );
+        req.on("error", reject);
+        req.write(body);
+        req.end();
+      });
+    }
+    async function exchangeCodeForTokens(code, verifier) {
+      const { status, body } = await postForm("/oauth/token", {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT_URI,
+        client_id: CLIENT_ID,
+        code_verifier: verifier
+      });
+      if (status < 200 || status >= 300) {
+        throw new Error(`Token exchange failed (${status})`);
+      }
+      let json;
+      try {
+        json = JSON.parse(body);
+      } catch {
+        throw new Error("Token exchange returned invalid JSON.");
+      }
+      if (!json.id_token || !json.access_token || !json.refresh_token) {
+        throw new Error("Token exchange missed id/access/refresh tokens.");
+      }
+      return json;
+    }
+    async function obtainApiKey(idToken) {
+      try {
+        const { status, body } = await postForm("/oauth/token", {
+          grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+          client_id: CLIENT_ID,
+          requested_token: "openai-api-key",
+          subject_token: idToken,
+          subject_token_type: "urn:ietf:params:oauth:token-type:id_token"
+        });
+        if (status < 200 || status >= 300) return null;
+        const json = JSON.parse(body);
+        return typeof json.access_token === "string" ? json.access_token : null;
+      } catch {
+        return null;
+      }
+    }
+    function chatgptAccountId(idToken) {
+      try {
+        const payload = JSON.parse(
+          Buffer.from(String(idToken).split(".")[1], "base64url").toString("utf8")
+        );
+        const claims = payload["https://api.openai.com/auth"] || {};
+        return typeof claims.chatgpt_account_id === "string" ? claims.chatgpt_account_id : null;
+      } catch {
+        return null;
+      }
+    }
+    function buildAuthJson(tokens, apiKey) {
+      const accountId = chatgptAccountId(tokens.id_token);
+      const auth = {
+        auth_mode: "chatgpt",
+        OPENAI_API_KEY: apiKey || null,
+        tokens: {
+          id_token: tokens.id_token,
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token
+        },
+        last_refresh: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      if (accountId) auth.tokens.account_id = accountId;
+      return auth;
+    }
+    function sanitizeAccountName(raw) {
+      let name = String(raw || "account").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-").replace(/[^a-zA-Z0-9._-]/g, "").replace(/^[^a-zA-Z0-9]+/, "").slice(0, 60);
+      if (!name) name = "account";
+      return name;
+    }
+    async function saveIncomingAccount(auth) {
+      const { fsp } = nodeDeps();
+      const { ACCOUNTS_DIR } = require_node_utils().codexAuthPaths();
+      await ensureDir(ACCOUNTS_DIR);
+      const raw = `${JSON.stringify(auth, null, 2)}
+`;
+      const accounts = await listAccountNames();
+      const existing = await findMatchingAccountByEmail(accounts, raw);
+      const profile = profileFromAuth(auth);
+      let name = existing;
+      if (!name) {
+        const base = sanitizeAccountName(profile.name || profile.email?.split("@")[0] || "account");
+        name = await nextAvailableAccountName(base);
+      }
+      await fsp.writeFile(accountPath(name), raw, "utf8");
+      return { name, profile, updated: Boolean(existing) };
+    }
+    function openLoginWindow(authUrl, expectedState, verifier) {
+      const { BrowserWindow, session } = electron();
+      const parent = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0] || null;
+      const ses = session.fromPartition(PARTITION);
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let win;
+        const finish = (error, tokens) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          try {
+            if (win && !win.isDestroyed()) win.close();
+          } catch {
+          }
+          if (error) reject(error);
+          else resolve(tokens);
+        };
+        const handleUrl = (url, event) => {
+          if (!isCallbackUrl(url)) return false;
+          if (event && typeof event.preventDefault === "function") event.preventDefault();
+          const callback = parseCallback(url);
+          if (callback.error) {
+            finish(
+              new Error(
+                callback.errorDescription || `Sign-in failed: ${callback.error}`
+              )
+            );
+            return true;
+          }
+          if (!callback.code) {
+            finish(new Error("Sign-in missed the authorization code."));
+            return true;
+          }
+          if (callback.state !== expectedState) {
+            finish(new Error("Sign-in state mismatch."));
+            return true;
+          }
+          exchangeCodeForTokens(callback.code, verifier).then(
+            (tokens) => finish(null, tokens),
+            (error) => finish(error)
+          );
+          return true;
+        };
+        const timer = setTimeout(() => {
+          finish(new Error("Sign-in timed out."));
+        }, LOGIN_TIMEOUT_MS);
+        ses.clearStorageData().finally(() => {
+          win = new BrowserWindow({
+            width: 480,
+            height: 740,
+            title: "Add Codex account",
+            autoHideMenuBar: true,
+            parent: parent || void 0,
+            modal: Boolean(parent),
+            show: true,
+            backgroundColor: "#202020",
+            webPreferences: {
+              partition: PARTITION,
+              nodeIntegration: false,
+              contextIsolation: true,
+              sandbox: true
+            }
+          });
+          win.webContents.setWindowOpenHandler(({ url }) => {
+            if (win && !win.isDestroyed()) win.loadURL(url);
+            return { action: "deny" };
+          });
+          win.webContents.on("will-redirect", (event, url) => handleUrl(url, event));
+          win.webContents.on("will-navigate", (event, url) => handleUrl(url, event));
+          win.webContents.on("did-navigate", (_event, url) => handleUrl(url));
+          win.webContents.on("did-fail-load", (_event, _code, _desc, url) => handleUrl(url));
+          win.on("closed", () => {
+            if (!settled) finish(new Error("Sign-in cancelled."));
+          });
+          win.loadURL(authUrl).catch((error) => finish(error));
+        });
+      });
+    }
+    async function runChatGptLogin(api2) {
+      if (inflight) {
+        api2?.log?.info?.("[account-switcher] add-account login window already open");
+        return inflight;
+      }
+      const pkce = generatePkce();
+      const state = generateState();
+      const authUrl = buildAuthorizeUrl(pkce.challenge, state);
+      api2?.log?.info?.("[account-switcher] opening isolated ChatGPT login window");
+      inflight = (async () => {
+        const tokens = await openLoginWindow(authUrl, state, pkce.verifier);
+        const apiKey = await obtainApiKey(tokens.id_token);
+        return buildAuthJson(tokens, apiKey);
+      })();
+      try {
+        return await inflight;
+      } finally {
+        inflight = null;
+      }
+    }
+    module.exports = {
+      CLIENT_ID,
+      REDIRECT_URI,
+      buildAuthorizeUrl,
+      isCallbackUrl,
+      parseCallback,
+      buildAuthJson,
+      sanitizeAccountName,
+      saveIncomingAccount,
+      runChatGptLogin
+    };
+  }
+});
+
+// codex-plusplus-account-switcher/src/account/actions.js
 var require_actions = __commonJS({
-  "src/account/actions.js"(exports, module) {
+  "codex-plusplus-account-switcher/src/account/actions.js"(exports, module) {
     var { t } = require_i18n();
     var {
       nodeDeps,
@@ -900,7 +1284,71 @@ var require_actions = __commonJS({
       if (!current) return readState();
       const snapshot = await fetchActiveUsageSnapshot(api2);
       await writeAccountUsage(current, snapshot);
-      return readState();
+      return maybeFailover(api2);
+    }
+    var failoverBusy = false;
+    async function maybeFailover(api2) {
+      const { readAutoswitchEnabled } = require_settings();
+      const { isUsageExhausted, pickFailoverAccount } = require_failover();
+      if (failoverBusy) return readState();
+      if (!await readAutoswitchEnabled()) return readState();
+      failoverBusy = true;
+      try {
+        let state = await readState();
+        const visited = /* @__PURE__ */ new Set();
+        let from = state.current;
+        while (state.current && isUsageExhausted(state.accountUsage?.[state.current])) {
+          if (visited.has(state.current)) break;
+          visited.add(state.current);
+          const next = pickFailoverAccount(
+            state.current,
+            state.accounts,
+            state.accountUsage,
+            visited
+          );
+          if (!next) break;
+          api2?.log?.info?.(
+            `[account-switcher] quota empty on ${state.current}; auto-switching to ${next}`
+          );
+          state = await switchAccount(next, api2);
+          from = from || state.current;
+        }
+        if (visited.size && state.current && !visited.has(state.current)) {
+          return {
+            ...state,
+            notice: t("service.autoSwitched", { from: [...visited][0], to: state.current }),
+            autoSwitched: true
+          };
+        }
+        return state;
+      } finally {
+        failoverBusy = false;
+      }
+    }
+    async function setAutoswitchEnabled(enabled) {
+      const { writeAutoswitchEnabled } = require_settings();
+      const value = await writeAutoswitchEnabled(enabled);
+      return readState({ notice: value ? t("profile.autoSwitchOn") : t("profile.autoSwitchOff") });
+    }
+    async function addAccountWithoutRelaunch(api2) {
+      const { ensureAutosavedActiveAccount } = require_storage();
+      const { runChatGptLogin: runChatGptLogin2, saveIncomingAccount: saveIncomingAccount2 } = require_login();
+      const { fsp } = nodeDeps();
+      const { AUTH_PATH } = codexAuthPaths();
+      const liveBefore = await pathExists(AUTH_PATH) ? await fsp.readFile(AUTH_PATH, "utf8") : null;
+      await ensureAutosavedActiveAccount();
+      const auth = await runChatGptLogin2(api2);
+      const saved = await saveIncomingAccount2(auth);
+      if (liveBefore != null) {
+        const liveAfter = await fsp.readFile(AUTH_PATH, "utf8");
+        if (liveAfter !== liveBefore) {
+          await fsp.writeFile(AUTH_PATH, liveBefore, "utf8");
+          api2?.log?.warn?.("[account-switcher] restored live auth.json after add-account");
+        }
+      }
+      const notice = saved.updated ? t("service.updated", { name: saved.name }) : t("service.added", { name: saved.name });
+      api2?.log?.info?.(`[account-switcher] added account snapshot ${saved.name} without touching live session`);
+      return readState({ notice, requiresAppRelaunch: false });
     }
     async function relaunchCodex(api) {
       api?.log?.info?.("[account-switcher] relaunch requested");
@@ -918,21 +1366,27 @@ var require_actions = __commonJS({
       deleteAccount,
       clearActiveAuth,
       refreshActiveUsage,
-      relaunchCodex
+      relaunchCodex,
+      addAccountWithoutRelaunch,
+      maybeFailover,
+      setAutoswitchEnabled
     };
   }
 });
 
-// src/account/service.js
+// codex-plusplus-account-switcher/src/account/service.js
 var require_service = __commonJS({
-  "src/account/service.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/account/service.js"(exports2, module2) {
     var { ok, fail, errorMessage, stringifyError } = require_utils();
     var {
       clearActiveAuth: clearActiveAuth2,
       deleteAccount: deleteAccount2,
       refreshActiveUsage: refreshActiveUsage2,
       relaunchCodex: relaunchCodex2,
+      addAccountWithoutRelaunch: addAccountWithoutRelaunch2,
+      maybeFailover: maybeFailover2,
       saveCurrentAccount: saveCurrentAccount2,
+      setAutoswitchEnabled: setAutoswitchEnabled2,
       switchAccount: switchAccount2
     } = require_actions();
     var { readState: readState2 } = require_state();
@@ -949,6 +1403,9 @@ var require_service = __commonJS({
             if (action === "clear-active") return ok(await clearActiveAuth2(api2));
             if (action === "refresh-usage") return ok(await refreshActiveUsage2(api2));
             if (action === "relaunch") return ok(await relaunchCodex2(api2));
+            if (action === "add-account") return ok(await addAccountWithoutRelaunch2(api2));
+            if (action === "failover-check") return ok(await maybeFailover2(api2));
+            if (action === "set-autoswitch") return ok(await setAutoswitchEnabled2(message?.enabled !== false));
             return fail(`Unknown account action: ${String(action)}`);
           } catch (error) {
             api2.log.warn("[account-switcher] action failed", stringifyError(error));
@@ -961,9 +1418,9 @@ var require_service = __commonJS({
   }
 });
 
-// src/dom-utils.js
+// codex-plusplus-account-switcher/src/dom-utils.js
 var require_dom_utils = __commonJS({
-  "src/dom-utils.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/dom-utils.js"(exports2, module2) {
     function compactText(element) {
       return (element?.textContent || "").replace(/\s+/g, " ").trim();
     }
@@ -1003,9 +1460,9 @@ var require_dom_utils = __commonJS({
   }
 });
 
-// src/ipc.js
+// codex-plusplus-account-switcher/src/ipc.js
 var require_ipc = __commonJS({
-  "src/ipc.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/ipc.js"(exports2, module2) {
     var { IPC_CHANNEL: IPC_CHANNEL2 } = require_constants();
     async function invoke(state, action, payload = {}) {
       const result = await state.api.ipc.invoke(IPC_CHANNEL2, { ...payload, action });
@@ -1017,9 +1474,9 @@ var require_ipc = __commonJS({
   }
 });
 
-// src/ui-components.js
+// codex-plusplus-account-switcher/src/ui-components.js
 var require_ui_components = __commonJS({
-  "src/ui-components.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/ui-components.js"(exports2, module2) {
     var { protectInteractiveControl } = require_dom_utils();
     function addButtonFeedback(element, styles) {
       const normal = {
@@ -1179,9 +1636,9 @@ var require_ui_components = __commonJS({
   }
 });
 
-// src/ui-profile-menu.js
+// codex-plusplus-account-switcher/src/ui-profile-menu.js
 var require_ui_profile_menu = __commonJS({
-  "src/ui-profile-menu.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/ui-profile-menu.js"(exports2, module2) {
     var { compactText, isVisible, protectInteractiveControl } = require_dom_utils();
     var { invoke } = require_ipc();
     var { t: t2 } = require_i18n();
@@ -1285,6 +1742,7 @@ var require_ui_profile_menu = __commonJS({
           block.appendChild(profileAccountRow(state, name, accountState));
         }
         block.appendChild(addSubscriptionRow(state));
+        block.appendChild(autoSwitchRow(state, accountState));
         if (accountState?.error) {
           const error = document.createElement("div");
           error.style.cssText = "padding:4px 10px;font-size:11px;color:var(--color-token-text-error,#c2410c);";
@@ -1339,18 +1797,32 @@ var require_ui_profile_menu = __commonJS({
         isCurrent ? `${displayName} (${t2("accounts.current")})` : t2("profile.switchTo", { name: displayName })
       );
       button.disabled = isCurrent || !!state.profileMenuBusy;
-      button.style.cssText = "width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;";
-      if (isCurrent) button.style.background = "color-mix(in srgb, currentColor 6%, transparent)";
+      button.style.cssText = "width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 7px;border-radius:10px;cursor:pointer;box-sizing:border-box;border-left:3px solid transparent;";
+      if (isCurrent) {
+        button.style.background = "color-mix(in srgb, #14b8a6 16%, transparent)";
+        button.style.borderLeftColor = "#14b8a6";
+        button.style.cursor = "default";
+      }
+      const avatarWrap = document.createElement("div");
+      avatarWrap.style.cssText = "position:relative;width:28px;height:28px;flex-shrink:0;";
       const avatar = document.createElement("div");
       avatar.setAttribute("aria-hidden", "true");
       const color = isCurrent ? "#14b8a6" : avatarColor(name);
-      avatar.style.cssText = `width:28px;height:28px;border-radius:999px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;background:${color};`;
+      avatar.style.cssText = `width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;background:${color};`;
       avatar.textContent = initials(displayName);
+      avatarWrap.appendChild(avatar);
+      if (isCurrent) {
+        const check = document.createElement("div");
+        check.setAttribute("aria-hidden", "true");
+        check.style.cssText = "position:absolute;right:-3px;bottom:-3px;width:14px;height:14px;border-radius:999px;background:#14b8a6;color:#042f2e;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--color-token-main-surface-primary, #202020);";
+        check.innerHTML = '<svg width="9" height="9" viewBox="0 0 12 12" fill="none"><path d="M2.2 6.2l2.4 2.4 5.2-5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        avatarWrap.appendChild(check);
+      }
       const copy = document.createElement("div");
       copy.style.cssText = "min-width:0;flex:1;display:flex;flex-direction:column;gap:2px;";
       const title = document.createElement("div");
       title.style.cssText = "font-size:14px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-      title.textContent = isCurrent ? `${t2("profile.primary")} \xB7 ${plan}` : `${displayName} \xB7 ${plan}`;
+      title.textContent = `${displayName} \xB7 ${plan}`;
       title.title = displayName;
       const dots = document.createElement("div");
       dots.style.cssText = "font-size:11px;letter-spacing:1.5px;color:var(--color-token-text-secondary,currentColor);opacity:0.7;";
@@ -1364,17 +1836,30 @@ var require_ui_profile_menu = __commonJS({
         reset.textContent = t2("profile.resets", { when: resetAt });
         copy.appendChild(reset);
       }
+      const right = document.createElement("div");
+      right.style.cssText = "flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:52px;";
+      if (isCurrent) {
+        const badge = document.createElement("span");
+        badge.textContent = t2("accounts.current");
+        badge.style.cssText = "font-size:10px;font-weight:700;letter-spacing:0.04em;line-height:16px;padding:1px 7px;border-radius:999px;background:#14b8a6;color:#042f2e;text-transform:uppercase;";
+        right.appendChild(badge);
+      }
       const value = document.createElement("div");
       value.style.cssText = "font-size:14px;line-height:18px;font-variant-numeric:tabular-nums;color:var(--color-token-text-primary,currentColor);";
       value.textContent = pct == null ? "\u2014" : `${pct}%`;
-      button.append(avatar, copy, value);
+      right.appendChild(value);
+      button.append(avatarWrap, copy, right);
       protectInteractiveControl(button);
       button.addEventListener("pointerenter", () => {
-        if (button.disabled) return;
+        if (button.disabled && !isCurrent) return;
+        if (isCurrent) {
+          button.style.background = "color-mix(in srgb, #14b8a6 22%, transparent)";
+          return;
+        }
         button.style.background = "color-mix(in srgb, currentColor 10%, transparent)";
       });
       button.addEventListener("pointerleave", () => {
-        button.style.background = isCurrent ? "color-mix(in srgb, currentColor 6%, transparent)" : "transparent";
+        button.style.background = isCurrent ? "color-mix(in srgb, #14b8a6 16%, transparent)" : "transparent";
       });
       if (!isCurrent) {
         bindButtonAction(button, () => switchFromProfileMenu(state, name, displayName));
@@ -1404,19 +1889,73 @@ var require_ui_profile_menu = __commonJS({
       bindButtonAction(button, () => addAccountFromProfileMenu(state));
       return button;
     }
+    function autoSwitchRow(state, accountState) {
+      const enabled = accountState?.autoswitchEnabled !== false;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("data-codexpp-profile-autoswitch", "true");
+      button.setAttribute("aria-pressed", enabled ? "true" : "false");
+      button.style.cssText = "width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;";
+      const icon = document.createElement("div");
+      icon.setAttribute("aria-hidden", "true");
+      icon.style.cssText = "width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:0.85;";
+      icon.textContent = enabled ? "\u21BB" : "\u25CB";
+      const copy = document.createElement("div");
+      copy.style.cssText = "min-width:0;flex:1;font-size:14px;line-height:18px;";
+      copy.textContent = t2("profile.autoSwitch");
+      const badge = document.createElement("span");
+      badge.textContent = enabled ? t2("profile.autoSwitchOn") : t2("profile.autoSwitchOff");
+      badge.style.cssText = "flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:0.04em;line-height:16px;padding:1px 7px;border-radius:999px;" + (enabled ? "background:#14b8a6;color:#042f2e;" : "background:color-mix(in srgb, currentColor 12%, transparent);color:inherit;");
+      button.append(icon, copy, badge);
+      protectInteractiveControl(button);
+      button.addEventListener("pointerenter", () => {
+        button.style.background = "color-mix(in srgb, currentColor 10%, transparent)";
+      });
+      button.addEventListener("pointerleave", () => {
+        button.style.background = "transparent";
+      });
+      bindButtonAction(button, async () => {
+        try {
+          const next = await invoke(state, "set-autoswitch", { enabled: !enabled });
+          refreshProfileMenu(state, next);
+        } catch (error) {
+          state.api.log.warn("[account-switcher] toggle autoswitch failed", errorMessage(error));
+        }
+      });
+      return button;
+    }
     async function addAccountFromProfileMenu(state) {
       if (state.profileMenuBusy) return;
-      const ok = window.confirm(`${t2("accounts.confirmTitle")}
-
-${t2("accounts.confirmMessage")}`);
-      if (!ok) return;
       state.profileMenuBusy = true;
+      const popup = findProfilePopup();
+      const addBtn = popup?.querySelector("[data-codexpp-profile-add]");
+      const label = addBtn?.querySelector("div:last-child");
+      const previous = label?.textContent;
+      if (addBtn) addBtn.disabled = true;
+      if (label) label.textContent = t2("profile.signingIn");
       try {
-        await invoke(state, "clear-active");
-        await invoke(state, "relaunch");
+        const accountState = await invoke(state, "add-account");
+        state.api.log.info("[account-switcher] added account without relaunch");
+        refreshProfileMenu(state, accountState);
+        if (state.directPage?.sections?.isConnected) {
+          const { renderAccountsPageState } = require_ui_settings();
+          renderAccountsPageState(state, state.directPage.sections, accountState);
+        }
       } catch (error) {
-        state.api.log.warn("[account-switcher] add account failed", errorMessage(error));
+        const message = errorMessage(error);
+        state.api.log.warn("[account-switcher] add account failed", message);
+        const open = findProfilePopup();
+        if (open) {
+          const cancelled = /cancel/i.test(message);
+          renderProfileAccounts(state, open, {
+            ...state.lastState || { accounts: [] },
+            error: cancelled ? t2("profile.addCancelled") : t2("profile.addFailed", { error: message })
+          });
+        }
+      } finally {
         state.profileMenuBusy = false;
+        if (label && previous) label.textContent = previous;
+        if (addBtn) addBtn.disabled = false;
       }
     }
     function accountRemainingPct(accountState, name) {
@@ -1610,7 +2149,7 @@ ${t2("accounts.confirmMessage")}`);
     function profileFingerprint(accountState) {
       if (!accountState) return "";
       const accounts = Array.isArray(accountState.accounts) ? accountState.accounts.join(",") : "";
-      return `${accounts}|${accountState.current || ""}|${accountState.error || ""}`;
+      return `${accounts}|${accountState.current || ""}|${accountState.error || ""}|${accountState.autoswitchEnabled ? 1 : 0}`;
     }
     function normalizeLabel(label) {
       return String(label || "").replace(/\s+/g, " ").trim().toLowerCase();
@@ -1647,9 +2186,9 @@ ${t2("accounts.confirmMessage")}`);
   }
 });
 
-// src/ui-settings.js
+// codex-plusplus-account-switcher/src/ui-settings.js
 var require_ui_settings = __commonJS({
-  "src/ui-settings.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/ui-settings.js"(exports2, module2) {
     var { errorMessage } = require_utils();
     var { invoke } = require_ipc();
     var { t: t2 } = require_i18n();
@@ -1691,85 +2230,11 @@ var require_ui_settings = __commonJS({
         borderRadius: "10px",
         fontSize: "12px"
       });
-      bindButtonAction(add, () => showAddAccountConfirmation(state, root, add));
+      bindButtonAction(add, () => addAccountFromSettings(state, root));
       actions.append(refresh, add);
     }
-    function showAddAccountConfirmation(state, root, trigger) {
-      const page = root.closest("[data-codexpp-account-page]");
-      if (!(page instanceof HTMLElement)) return;
-      page.querySelector("[data-codexpp-account-confirmation]")?.remove();
-      const overlay = document.createElement("div");
-      overlay.setAttribute("data-codexpp-account-confirmation", "true");
-      overlay.setAttribute("role", "presentation");
-      Object.assign(overlay.style, {
-        position: "fixed",
-        inset: "0",
-        zIndex: "1000",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        background: "rgba(0, 0, 0, 0.52)",
-        backdropFilter: "blur(2px)"
-      });
-      const dialog = document.createElement("div");
-      dialog.setAttribute("role", "dialog");
-      dialog.setAttribute("aria-modal", "true");
-      dialog.setAttribute("aria-labelledby", "codexpp-add-account-title");
-      dialog.className = "border-token-border flex flex-col overflow-hidden rounded-xl border";
-      Object.assign(dialog.style, {
-        width: "420px",
-        maxWidth: "calc(100vw - 48px)",
-        background: "var(--color-token-main-surface-primary, #181818)",
-        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.42)"
-      });
-      const content = document.createElement("div");
-      content.className = "flex flex-col gap-2 p-5";
-      const title = document.createElement("div");
-      title.id = "codexpp-add-account-title";
-      title.className = "text-base font-medium text-token-text-primary";
-      title.textContent = t2("accounts.confirmTitle");
-      const message = document.createElement("div");
-      message.className = "text-sm leading-5 text-token-text-secondary";
-      message.textContent = t2("accounts.confirmMessage");
-      content.append(title, message);
-      const footer = document.createElement("div");
-      footer.className = "border-token-border flex items-center justify-end gap-2 border-t px-5 py-3";
-      const cancel = settingsButton(t2("accounts.cancel"));
-      const confirm = primaryButton(t2("accounts.confirmAdd"));
-      footer.append(cancel, confirm);
-      dialog.append(content, footer);
-      overlay.appendChild(dialog);
-      page.appendChild(overlay);
-      const close = () => {
-        overlay.remove();
-        if (trigger.isConnected) trigger.focus();
-      };
-      bindButtonAction(cancel, close);
-      bindButtonAction(confirm, () => {
-        overlay.remove();
-        clearActiveFromAccounts(state, root);
-      });
-      overlay.addEventListener("pointerdown", (event) => {
-        if (event.target === overlay) close();
-      });
-      overlay.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        close();
-      });
-      overlay.animate?.([{ opacity: 0 }, { opacity: 1 }], {
-        duration: 120,
-        easing: "ease-out"
-      });
-      dialog.animate?.(
-        [
-          { opacity: 0, transform: "translateY(6px) scale(0.98)" },
-          { opacity: 1, transform: "translateY(0) scale(1)" }
-        ],
-        { duration: 160, easing: "cubic-bezier(0.2, 0, 0, 1)" }
-      );
-      window.requestAnimationFrame(() => cancel.focus());
+    function addAccountFromSettings(state, root) {
+      runAccountAction(state, root, "add-account", {}, t2("profile.signingIn"));
     }
     function renderAccountsPageState(state, root, accountState) {
       root.textContent = "";
@@ -2019,9 +2484,6 @@ var require_ui_settings = __commonJS({
       svg.appendChild(path);
       return svg;
     }
-    function clearActiveFromAccounts(state, root) {
-      runAccountAction(state, root, "clear-active", {}, t2("accounts.preparingSignIn"));
-    }
     function refreshUsageInBackground(state, root) {
       const now = Date.now();
       if (state.usageRefreshInFlight || now - (state.lastUsageRefreshAt || 0) < 6e4) return;
@@ -2074,9 +2536,9 @@ var require_ui_settings = __commonJS({
   }
 });
 
-// src/ui-sidebar.js
+// codex-plusplus-account-switcher/src/ui-sidebar.js
 var require_ui_sidebar = __commonJS({
-  "src/ui-sidebar.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/ui-sidebar.js"(exports2, module2) {
     var { compactText, isVisible } = require_dom_utils();
     var { renderAccountsPage } = require_ui_settings();
     var SHORTCUT_ATTR = "data-codexpp-account-switch-shortcut";
@@ -2319,20 +2781,76 @@ var require_ui_sidebar = __commonJS({
   }
 });
 
-// src/renderer.js
+// codex-plusplus-account-switcher/src/ui-failover.js
+var require_ui_failover = __commonJS({
+  "codex-plusplus-account-switcher/src/ui-failover.js"(exports2, module2) {
+    var { invoke } = require_ipc();
+    var { refreshProfileMenu } = require_ui_profile_menu();
+    var { errorMessage } = require_utils();
+    var OUT_OF_QUOTA = /out of codex/i;
+    var INTERVAL_MS = 45e3;
+    function mountFailoverWatch(state) {
+      const run = () => {
+        if (state.disposed || state.failoverWatchBusy) return;
+        state.failoverWatchBusy = true;
+        invoke(state, "refresh-usage").then((accountState) => {
+          if (state.disposed || !accountState) return;
+          if (accountState.autoSwitched) {
+            state.api.log.info(
+              `[account-switcher] auto-switched to ${accountState.current} after quota empty`
+            );
+            refreshProfileMenu(state, accountState);
+          }
+        }).catch((error) => {
+          state.api.log.warn("[account-switcher] failover watch failed", errorMessage(error));
+        }).finally(() => {
+          state.failoverWatchBusy = false;
+        });
+      };
+      const interval = window.setInterval(run, INTERVAL_MS);
+      const startup = window.setTimeout(run, 12e3);
+      let bannerTimer = 0;
+      const observer = new MutationObserver((records) => {
+        if (state.disposed) return;
+        for (const record of records) {
+          for (const node of record.addedNodes) {
+            if (!(node instanceof HTMLElement)) continue;
+            const text = node.innerText || node.textContent || "";
+            if (!OUT_OF_QUOTA.test(text)) continue;
+            if (bannerTimer) window.clearTimeout(bannerTimer);
+            bannerTimer = window.setTimeout(run, 500);
+            return;
+          }
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      state.disposers.push(() => {
+        window.clearInterval(interval);
+        window.clearTimeout(startup);
+        if (bannerTimer) window.clearTimeout(bannerTimer);
+        observer.disconnect();
+      });
+    }
+    module2.exports = { mountFailoverWatch };
+  }
+});
+
+// codex-plusplus-account-switcher/src/renderer.js
 var require_renderer = __commonJS({
-  "src/renderer.js"(exports2, module2) {
+  "codex-plusplus-account-switcher/src/renderer.js"(exports2, module2) {
     var { mountAccountSwitchShortcut } = require_ui_sidebar();
     var { mountProfileMenu } = require_ui_profile_menu();
+    var { mountFailoverWatch } = require_ui_failover();
     function startRenderer2(state) {
       mountAccountSwitchShortcut(state);
       mountProfileMenu(state);
+      mountFailoverWatch(state);
     }
     module2.exports = { startRenderer: startRenderer2 };
   }
 });
 
-// index.js
+// codex-plusplus-account-switcher/index.js
 var { GLOBAL_SERVICE_KEY, IPC_HANDLER_KEY, IPC_CHANNEL } = require_constants();
 var { createAccountService } = require_service();
 var { startRenderer } = require_renderer();

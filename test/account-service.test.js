@@ -515,3 +515,101 @@ test("clear-active still requires an app relaunch", async () => {
     assert.equal(result.state.requiresAppRelaunch, true);
   });
 });
+
+test("saveIncomingAccount writes a snapshot and leaves live auth.json alone", async () => {
+  await withTempHome(async (home) => {
+    const { saveIncomingAccount, buildAuthJson, sanitizeAccountName } = require("../src/account/login");
+    const fs = require("node:fs/promises");
+    const path = require("node:path");
+    const codexDir = path.join(home, ".codex");
+    const accountsDir = path.join(codexDir, "auth_accounts");
+    await fs.mkdir(accountsDir, { recursive: true });
+    const live = authWithEmail("live@example.com");
+    await fs.writeFile(path.join(codexDir, "auth.json"), live);
+    await fs.writeFile(path.join(accountsDir, "account.json"), live);
+    await fs.writeFile(path.join(codexDir, "current_account"), "account\n");
+
+    assert.equal(sanitizeAccountName("Susan Jones"), "Susan-Jones");
+    const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+    const payload = Buffer.from(
+      JSON.stringify({
+        email: "new@example.com",
+        name: "New Person",
+        "https://api.openai.com/auth": { chatgpt_account_id: "acc-1" },
+      }),
+    ).toString("base64url");
+    const auth = buildAuthJson(
+      {
+        id_token: `${header}.${payload}.sig`,
+        access_token: "access-new",
+        refresh_token: "refresh-new",
+      },
+      null,
+    );
+    const saved = await saveIncomingAccount(auth);
+    assert.equal(saved.name, "New-Person");
+    assert.equal(saved.updated, false);
+    const liveAfter = await fs.readFile(path.join(codexDir, "auth.json"), "utf8");
+    assert.equal(liveAfter, live);
+    const current = await fs.readFile(path.join(codexDir, "current_account"), "utf8");
+    assert.equal(current.trim(), "account");
+    const snapshot = JSON.parse(await fs.readFile(path.join(accountsDir, "New-Person.json"), "utf8"));
+    assert.equal(snapshot.tokens.access_token, "access-new");
+    assert.equal(snapshot.tokens.account_id, "acc-1");
+  });
+});
+
+test("add-account action is registered", async () => {
+  await withTempHome(async () => {
+    const { createAccountService } = require("../src/account/service");
+    const service = createAccountService({ log: { info() {}, warn() {} } });
+    // Without a login window this fails, but it must not be an unknown action.
+    const result = await service.handle({ action: "add-account" });
+    assert.equal(result.ok, false);
+    assert.match(String(result.error || ""), /Cannot find module 'electron'|Sign-in|electron/i);
+  });
+});
+
+const {
+  isUsageExhausted,
+  hasUsageRemaining,
+  pickFailoverAccount,
+} = require("../src/account/failover");
+
+test("failover only hops off an exhausted current account", () => {
+  const usage = {
+    a: { weekly: { pct: 0 }, fiveHour: { pct: 0 } },
+    b: { weekly: { pct: 40 }, fiveHour: { pct: 80 } },
+    c: { weekly: { pct: 10 }, fiveHour: { pct: 5 } },
+  };
+  assert.equal(isUsageExhausted(usage.a), true);
+  assert.equal(hasUsageRemaining(usage.b), true);
+  assert.equal(pickFailoverAccount("a", ["a", "b", "c"], usage), "b");
+  assert.equal(pickFailoverAccount("b", ["a", "b", "c"], usage), null);
+});
+
+test("failover stays put when every saved account is empty", () => {
+  const usage = {
+    a: { weekly: { pct: 0 } },
+    b: { fiveHour: { pct: 0 } },
+  };
+  assert.equal(pickFailoverAccount("a", ["a", "b"], usage), null);
+});
+
+test("set-autoswitch persists enabled flag", async () => {
+  await withTempHome(async (home) => {
+    const fs = require("node:fs/promises");
+    const path = require("node:path");
+    const { createAccountService } = require("../src/account/service");
+    const service = createAccountService({ log: { info() {}, warn() {} } });
+    const off = await service.handle({ action: "set-autoswitch", enabled: false });
+    assert.equal(off.ok, true);
+    assert.equal(off.state.autoswitchEnabled, false);
+    const raw = JSON.parse(
+      await fs.readFile(path.join(home, ".codex", "auth_accounts_autoswitch.json"), "utf8"),
+    );
+    assert.equal(raw.enabled, false);
+    const on = await service.handle({ action: "set-autoswitch", enabled: true });
+    assert.equal(on.state.autoswitchEnabled, true);
+  });
+});

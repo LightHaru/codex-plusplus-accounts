@@ -4,7 +4,10 @@ const {
   deleteAccount,
   refreshActiveUsage,
   relaunchCodex,
+  addAccountWithoutRelaunch,
+  maybeFailover,
   saveCurrentAccount,
+  setAutoswitchEnabled,
   switchAccount,
 } = require("./actions");
 const { readState } = require("./state");
@@ -22,6 +25,9 @@ function createAccountService(api) {
         if (action === "clear-active") return ok(await clearActiveAuth(api));
         if (action === "refresh-usage") return ok(await refreshActiveUsage(api));
         if (action === "relaunch") return ok(await relaunchCodex(api));
+        if (action === "add-account") return ok(await addAccountWithoutRelaunch(api));
+        if (action === "failover-check") return ok(await maybeFailover(api));
+        if (action === "set-autoswitch") return ok(await setAutoswitchEnabled(message?.enabled !== false));
         return fail(`Unknown account action: ${String(action)}`);
       } catch (error) {
         api.log.warn("[account-switcher] action failed", stringifyError(error));
