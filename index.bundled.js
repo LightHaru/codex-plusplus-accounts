@@ -214,6 +214,8 @@ var require_utils = __commonJS({
 var require_i18n = __commonJS({
   "src/i18n.js"(exports2, module2) {
     var STRINGS = {
+      "accounts.pageTitle": "Accounts",
+      "accounts.pageSubtitle": "Switch, add, or remove ChatGPT sessions without restarting.",
       "accounts.loading": "Loading saved accounts...",
       "accounts.refresh": "Refresh accounts",
       "accounts.add": "Add account",
@@ -1907,6 +1909,65 @@ var require_ui_components = __commonJS({
   }
 });
 
+// src/display.js
+var require_display = __commonJS({
+  "src/display.js"(exports2, module2) {
+    var AVATAR_COLORS = ["#3b82f6", "#c4b5a5", "#7f1d1d", "#6366f1", "#a16207", "#0f766e"];
+    function initials(label) {
+      const parts = String(label || "A").trim().split(/\s+/).filter(Boolean);
+      if (!parts.length) return "A";
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    function avatarColor(name) {
+      let hash = 0;
+      for (const ch of String(name)) hash = hash * 31 + ch.charCodeAt(0) >>> 0;
+      return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+    }
+    function formatPlan(plan) {
+      const raw = String(plan || "").trim();
+      if (!raw) return "Plus";
+      if (/^plus$/i.test(raw)) return "Plus";
+      if (/^pro$/i.test(raw)) return "Pro";
+      if (/20x/i.test(raw)) return raw.replace(/^./, (c) => c.toUpperCase());
+      return raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+    function accountRemainingPct(accountState, name) {
+      const usage = accountState?.accountUsage?.[name];
+      const weekly = usage?.weekly?.pct;
+      const five = usage?.fiveHour?.pct;
+      if (typeof weekly === "number") return weekly;
+      if (typeof five === "number") return five;
+      return null;
+    }
+    function totalRemainingPct(accountState) {
+      const accounts = Array.isArray(accountState?.accounts) ? accountState.accounts : [];
+      let sum = 0;
+      let any = false;
+      for (const name of accounts) {
+        const pct = accountRemainingPct(accountState, name);
+        if (typeof pct === "number") {
+          sum += pct;
+          any = true;
+        }
+      }
+      return any ? sum : null;
+    }
+    function accountResetAt(accountState, name) {
+      const usage = accountState?.accountUsage?.[name];
+      return usage?.weekly?.resetAt || usage?.fiveHour?.resetAt || null;
+    }
+    module2.exports = {
+      initials,
+      avatarColor,
+      formatPlan,
+      accountRemainingPct,
+      totalRemainingPct,
+      accountResetAt
+    };
+  }
+});
+
 // src/ui-profile-menu.js
 var require_ui_profile_menu = __commonJS({
   "src/ui-profile-menu.js"(exports2, module2) {
@@ -1918,6 +1979,13 @@ var require_ui_profile_menu = __commonJS({
       accountDisplayName,
       bindButtonAction
     } = require_ui_components();
+    var {
+      accountRemainingPct,
+      totalRemainingPct,
+      formatPlan,
+      initials,
+      avatarColor
+    } = require_display();
     var BLOCK_ATTR = "data-codexpp-profile-accounts";
     var PATCHED_ATTR = "data-codexpp-profile-patched";
     var POPUP_SELECTOR = [
@@ -2229,47 +2297,6 @@ var require_ui_profile_menu = __commonJS({
         if (addBtn) addBtn.disabled = false;
       }
     }
-    function accountRemainingPct(accountState, name) {
-      const usage = accountState?.accountUsage?.[name];
-      const weekly = usage?.weekly?.pct;
-      const five = usage?.fiveHour?.pct;
-      if (typeof weekly === "number") return weekly;
-      if (typeof five === "number") return five;
-      return null;
-    }
-    function totalRemainingPct(accountState) {
-      const accounts = Array.isArray(accountState?.accounts) ? accountState.accounts : [];
-      let sum = 0;
-      let any = false;
-      for (const name of accounts) {
-        const pct = accountRemainingPct(accountState, name);
-        if (typeof pct === "number") {
-          sum += pct;
-          any = true;
-        }
-      }
-      return any ? sum : null;
-    }
-    function formatPlan(plan) {
-      const raw = String(plan || "").trim();
-      if (!raw) return "Plus";
-      if (/^plus$/i.test(raw)) return "Plus";
-      if (/^pro$/i.test(raw)) return "Pro";
-      if (/20x/i.test(raw)) return raw.replace(/^./, (c) => c.toUpperCase());
-      return raw.charAt(0).toUpperCase() + raw.slice(1);
-    }
-    function initials(label) {
-      const parts = String(label || "A").trim().split(/\s+/).filter(Boolean);
-      if (!parts.length) return "A";
-      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    var AVATAR_COLORS = ["#3b82f6", "#c4b5a5", "#7f1d1d", "#6366f1", "#a16207", "#0f766e"];
-    function avatarColor(name) {
-      let hash = 0;
-      for (const ch of String(name)) hash = hash * 31 + ch.charCodeAt(0) >>> 0;
-      return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-    }
     async function switchFromProfileMenu(state, name, displayName) {
       if (state.profileMenuBusy) return;
       state.profileMenuBusy = true;
@@ -2469,9 +2496,16 @@ var require_ui_settings = __commonJS({
       iconButton,
       settingsStatus,
       accountDisplayName,
-      accountUsageSummary,
       bindButtonAction
     } = require_ui_components();
+    var {
+      accountRemainingPct,
+      totalRemainingPct,
+      formatPlan,
+      initials,
+      avatarColor,
+      accountResetAt
+    } = require_display();
     async function renderAccountsPage(state, root) {
       renderHeaderActions(state, root);
       root.textContent = "";
@@ -2508,30 +2542,85 @@ var require_ui_settings = __commonJS({
       runAccountAction(state, root, "add-account", {}, t2("profile.signingIn"));
     }
     function renderAccountsPageState(state, root, accountState) {
+      state.lastState = accountState;
       root.textContent = "";
-      const section = document.createElement("section");
-      section.className = "flex flex-col";
-      const heading = document.createElement("div");
-      heading.className = "border-token-border flex items-center justify-between border-b pb-2 text-base font-medium text-token-text-primary";
-      heading.textContent = t2("accounts.saved");
-      section.appendChild(heading);
-      const list = document.createElement("div");
-      list.className = "flex flex-col gap-2 pt-3";
       const accounts = Array.isArray(accountState.accounts) ? accountState.accounts : [];
-      if (!accounts.length) {
-        list.appendChild(emptyAccountsRow(accountState));
-      } else {
-        for (const name of accounts) {
-          list.appendChild(accountCard(state, root, accountState, name));
-        }
+      const section = document.createElement("section");
+      section.className = "flex flex-col gap-3";
+      if (accounts.length) section.appendChild(usageSummaryCard(accountState, accounts.length));
+      const list = document.createElement("div");
+      list.className = "flex flex-col gap-2";
+      if (!accounts.length) list.appendChild(emptyAccountsRow(accountState));
+      else {
+        for (const name of accounts) list.appendChild(accountCard(state, root, accountState, name));
       }
       section.appendChild(list);
+      if (accounts.length) section.appendChild(autoSwitchCard(state, root, accountState));
       root.appendChild(section);
       if (accountState.notice || accountState.error) {
         const status = settingsStatus(accountState.notice || accountState.error, !!accountState.error);
-        status.classList.add("pt-4");
+        status.classList.add("pt-2");
         root.appendChild(status);
       }
+    }
+    function usageSummaryCard(accountState, count) {
+      const row = document.createElement("div");
+      row.className = "flex items-center gap-3 rounded-2xl px-4 py-3";
+      row.style.background = "color-mix(in srgb, var(--color-token-text-primary, #fff) 5%, transparent)";
+      const icon = document.createElement("div");
+      icon.setAttribute("aria-hidden", "true");
+      icon.className = "flex size-10 shrink-0 items-center justify-center text-token-text-secondary";
+      icon.appendChild(usageClockIcon());
+      const copy = document.createElement("div");
+      copy.className = "flex min-w-0 flex-1 flex-col gap-0.5";
+      const title = document.createElement("div");
+      title.className = "text-base font-medium text-token-text-primary";
+      title.textContent = t2("profile.usageRemaining");
+      const sub = document.createElement("div");
+      sub.className = "text-sm text-token-text-secondary";
+      sub.textContent = t2("profile.connected", { n: count });
+      copy.append(title, sub);
+      const total = totalRemainingPct(accountState);
+      const value = document.createElement("div");
+      value.className = "shrink-0 text-base font-medium tabular-nums text-token-text-primary";
+      value.textContent = total == null ? "\u2014" : `${total}%`;
+      row.append(icon, copy, value);
+      return row;
+    }
+    function autoSwitchCard(state, root, accountState) {
+      const enabled = accountState?.autoswitchEnabled !== false;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("aria-pressed", enabled ? "true" : "false");
+      button.className = "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left";
+      Object.assign(button.style, {
+        background: "color-mix(in srgb, var(--color-token-text-primary, #fff) 5%, transparent)",
+        border: "0",
+        color: "inherit",
+        cursor: "pointer"
+      });
+      const icon = document.createElement("div");
+      icon.setAttribute("aria-hidden", "true");
+      icon.className = "flex size-10 shrink-0 items-center justify-center text-base text-token-text-secondary";
+      icon.textContent = enabled ? "\u21BB" : "\u25CB";
+      const copy = document.createElement("div");
+      copy.className = "min-w-0 flex-1 text-sm font-medium text-token-text-primary";
+      copy.textContent = t2("profile.autoSwitch");
+      const badge = document.createElement("span");
+      badge.textContent = enabled ? t2("profile.autoSwitchOn") : t2("profile.autoSwitchOff");
+      badge.style.cssText = "flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:0.04em;line-height:16px;padding:1px 7px;border-radius:999px;" + (enabled ? "background:#14b8a6;color:#042f2e;" : "background:color-mix(in srgb, currentColor 12%, transparent);color:inherit;");
+      button.append(icon, copy, badge);
+      bindButtonAction(button, async () => {
+        try {
+          const next = await invoke(state, "set-autoswitch", { enabled: !enabled });
+          if (root.isConnected) renderAccountsPageState(state, root, next);
+          const { refreshProfileMenu } = require_ui_profile_menu();
+          refreshProfileMenu(state, next);
+        } catch (error) {
+          state.api.log.warn("[account-switcher] toggle autoswitch failed", errorMessage(error));
+        }
+      });
+      return button;
     }
     function emptyAccountsRow(accountState) {
       const row = rowShell();
@@ -2548,45 +2637,84 @@ var require_ui_settings = __commonJS({
       return row;
     }
     function accountCard(state, root, accountState, name) {
+      const profile = accountState.accountProfiles?.[name] || {};
+      const isCurrent = accountState.current === name;
+      const displayName = profile.name || accountDisplayName(accountState, name, { includeCurrent: false });
+      const plan = formatPlan(profile.plan);
+      const pct = accountRemainingPct(accountState, name);
+      const emailText = profile.email || accountState.accountEmails?.[name] || "";
+      const resetAt = accountResetAt(accountState, name);
+      const usage = accountState.accountUsage?.[name];
       const card = document.createElement("div");
       card.className = "relative flex min-h-20 items-center gap-3 rounded-2xl px-4 py-3";
-      card.style.background = "color-mix(in srgb, var(--color-token-text-primary, #fff) 5%, transparent)";
+      card.style.boxSizing = "border-box";
+      card.style.borderLeft = "3px solid transparent";
+      card.style.background = isCurrent ? "color-mix(in srgb, #14b8a6 16%, transparent)" : "color-mix(in srgb, var(--color-token-text-primary, #fff) 5%, transparent)";
+      if (isCurrent) {
+        card.style.borderLeftColor = "#14b8a6";
+        card.setAttribute("aria-current", "true");
+      } else {
+        card.style.cursor = "pointer";
+        card.setAttribute("role", "button");
+        card.setAttribute("tabindex", "0");
+        card.setAttribute("aria-label", t2("profile.switchTo", { name: displayName }));
+        card.addEventListener("pointerenter", () => {
+          card.style.background = "color-mix(in srgb, currentColor 10%, transparent)";
+        });
+        card.addEventListener("pointerleave", () => {
+          card.style.background = "color-mix(in srgb, var(--color-token-text-primary, #fff) 5%, transparent)";
+        });
+        const switchTo = (event) => {
+          if (event.target instanceof Element && event.target.closest("button")) return;
+          event.preventDefault();
+          event.stopPropagation();
+          runAccountAction(state, root, "switch", { name }, t2("accounts.switching"));
+        };
+        card.addEventListener("click", switchTo);
+        card.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          switchTo(event);
+        });
+      }
       const identity = document.createElement("div");
       identity.className = "flex min-w-0 flex-1 items-center gap-3";
-      const displayName = accountDisplayName(accountState, name, { includeCurrent: false });
-      const profile = accountState.accountProfiles?.[name] || {};
-      identity.appendChild(accountAvatar(profile.name || displayName));
+      identity.appendChild(accountAvatar(name, displayName, isCurrent));
       const copy = document.createElement("div");
       copy.className = "flex min-w-0 flex-1 flex-col gap-0.5";
-      const titleLine = document.createElement("div");
-      titleLine.className = "flex min-w-0 items-center gap-2";
       const title = document.createElement("div");
       title.className = "min-w-0 truncate text-base font-medium text-token-text-primary";
-      title.textContent = profile.name || displayName;
-      title.title = title.textContent;
-      titleLine.appendChild(title);
-      const isCurrent = accountState.current === name;
-      if (isCurrent) titleLine.appendChild(currentBadge());
-      const profileLine = document.createElement("div");
-      profileLine.className = "flex min-w-0 items-center gap-2 text-sm text-token-text-secondary";
-      const email = document.createElement("span");
-      email.className = "min-w-0 truncate";
-      email.textContent = profile.email || displayName;
-      email.title = email.textContent;
-      profileLine.appendChild(email);
-      if (profile.organization) {
-        const organization = document.createElement("span");
-        organization.className = "shrink-0";
-        organization.textContent = `\xB7 ${profile.organization}`;
-        profileLine.appendChild(organization);
+      title.textContent = `${displayName} \xB7 ${plan}`;
+      title.title = displayName;
+      copy.appendChild(title);
+      if (emailText && emailText !== displayName) {
+        const email = document.createElement("div");
+        email.className = "min-w-0 truncate text-sm text-token-text-secondary";
+        email.textContent = emailText;
+        email.title = emailText;
+        copy.appendChild(email);
       }
-      if (profile.plan) profileLine.appendChild(planBadge(profile.plan));
-      const description = document.createElement("div");
-      description.className = "min-w-0 truncate text-xs text-token-text-secondary";
-      description.textContent = accountUsageSummary(accountState, name) || (isCurrent ? t2("accounts.currentSession") : t2("accounts.usageUnavailable"));
-      copy.append(titleLine, profileLine, description);
+      if (resetAt) {
+        const reset = document.createElement("div");
+        reset.className = "text-xs text-token-text-secondary";
+        reset.textContent = t2("profile.resets", { when: resetAt });
+        copy.appendChild(reset);
+      } else if (!usage) {
+        const description = document.createElement("div");
+        description.className = "text-xs text-token-text-secondary";
+        description.textContent = t2("accounts.usageUnavailable");
+        copy.appendChild(description);
+      }
       identity.appendChild(copy);
       card.appendChild(identity);
+      const right = document.createElement("div");
+      right.className = "flex shrink-0 flex-col items-end gap-1";
+      right.style.minWidth = "56px";
+      if (isCurrent) right.appendChild(currentBadge());
+      const value = document.createElement("div");
+      value.className = "text-base tabular-nums text-token-text-primary";
+      value.textContent = pct == null ? "\u2014" : `${pct}%`;
+      right.appendChild(value);
+      card.appendChild(right);
       const menuButton = iconButton(t2("accounts.actions", { account: displayName }), ellipsisIcon());
       menuButton.setAttribute("aria-haspopup", "menu");
       menuButton.setAttribute("aria-expanded", "false");
@@ -2599,6 +2727,73 @@ var require_ui_settings = __commonJS({
       });
       card.appendChild(menuButton);
       return card;
+    }
+    function accountAvatar(name, displayName, isCurrent) {
+      const wrap = document.createElement("div");
+      wrap.style.cssText = "position:relative;width:40px;height:40px;flex-shrink:0;";
+      const avatar = document.createElement("div");
+      avatar.setAttribute("aria-hidden", "true");
+      const color = isCurrent ? "#14b8a6" : avatarColor(name);
+      avatar.style.cssText = `width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;background:${color};`;
+      avatar.textContent = initials(displayName);
+      wrap.appendChild(avatar);
+      if (isCurrent) {
+        const check = document.createElement("div");
+        check.setAttribute("aria-hidden", "true");
+        check.style.cssText = "position:absolute;right:-2px;bottom:-2px;width:16px;height:16px;border-radius:999px;background:#14b8a6;color:#042f2e;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--color-token-main-surface-primary, #202020);";
+        check.appendChild(checkmarkIcon());
+        wrap.appendChild(check);
+      }
+      return wrap;
+    }
+    function currentBadge() {
+      const badge = document.createElement("span");
+      badge.textContent = t2("accounts.current");
+      badge.style.cssText = "font-size:10px;font-weight:700;letter-spacing:0.04em;line-height:16px;padding:1px 7px;border-radius:999px;background:#14b8a6;color:#042f2e;text-transform:uppercase;";
+      return badge;
+    }
+    function checkmarkIcon() {
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("width", "10");
+      svg.setAttribute("height", "10");
+      svg.setAttribute("viewBox", "0 0 12 12");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("aria-hidden", "true");
+      const path = document.createElementNS(ns, "path");
+      path.setAttribute("d", "M2.2 6.2l2.4 2.4 5.2-5.2");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "1.8");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      svg.appendChild(path);
+      return svg;
+    }
+    function usageClockIcon() {
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("width", "20");
+      svg.setAttribute("height", "20");
+      svg.setAttribute("viewBox", "0 0 20 20");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("aria-hidden", "true");
+      const arc = document.createElementNS(ns, "path");
+      arc.setAttribute("d", "M10 17.5a7.5 7.5 0 1 0-7.4-8.7");
+      arc.setAttribute("stroke", "currentColor");
+      arc.setAttribute("stroke-width", "1.5");
+      arc.setAttribute("stroke-linecap", "round");
+      const hand = document.createElementNS(ns, "path");
+      hand.setAttribute("d", "M10 10l4-3.2");
+      hand.setAttribute("stroke", "currentColor");
+      hand.setAttribute("stroke-width", "1.5");
+      hand.setAttribute("stroke-linecap", "round");
+      const center = document.createElementNS(ns, "circle");
+      center.setAttribute("cx", "10");
+      center.setAttribute("cy", "10");
+      center.setAttribute("r", "1.2");
+      center.setAttribute("fill", "currentColor");
+      svg.append(arc, hand, center);
+      return svg;
     }
     function showAccountMenu(state, root, card, trigger, accountState, name, isCurrent) {
       closeAccountMenus(root);
@@ -2679,26 +2874,6 @@ var require_ui_settings = __commonJS({
       const row = document.createElement("div");
       row.className = "border-token-border flex min-h-16 items-center justify-between gap-4 border-b py-3";
       return row;
-    }
-    function accountAvatar(label) {
-      const avatar = document.createElement("div");
-      avatar.setAttribute("aria-hidden", "true");
-      avatar.className = "border-token-border flex size-10 shrink-0 items-center justify-center rounded-full border bg-token-foreground/5 text-sm font-medium text-token-text-primary";
-      const first = String(label || "A").trim().charAt(0).toUpperCase();
-      avatar.textContent = first || "A";
-      return avatar;
-    }
-    function currentBadge() {
-      const badge = document.createElement("span");
-      badge.className = "shrink-0 rounded-md bg-token-foreground/10 px-1.5 py-0.5 text-[11px] font-medium text-token-text-secondary";
-      badge.textContent = t2("accounts.current");
-      return badge;
-    }
-    function planBadge(plan) {
-      const badge = document.createElement("span");
-      badge.className = "shrink-0 rounded-md border border-token-border px-1.5 py-0.5 text-[11px] capitalize text-token-text-secondary";
-      badge.textContent = plan;
-      return badge;
     }
     function ellipsisIcon() {
       return svgIcon([
@@ -2812,6 +2987,7 @@ var require_ui_sidebar = __commonJS({
   "src/ui-sidebar.js"(exports2, module2) {
     var { compactText, isVisible } = require_dom_utils();
     var { renderAccountsPage } = require_ui_settings();
+    var { t: t2 } = require_i18n();
     var SHORTCUT_ATTR = "data-codexpp-account-switch-shortcut";
     var MAIN_SIDEBAR_SELECTOR = "aside, .window-fx-sidebar-surface.w-token-sidebar, [data-testid*='sidebar' i]";
     var CONTROL_SELECTOR = "button, a, [role='button'], [role='link']";
@@ -2998,10 +3174,10 @@ var require_ui_sidebar = __commonJS({
       header.className = "flex min-w-0 flex-col gap-1.5 pb-8";
       const heading = document.createElement("div");
       heading.className = "truncate text-2xl font-normal text-token-text-primary";
-      heading.textContent = "Accounts";
+      heading.textContent = t2("accounts.pageTitle");
       const subtitle = document.createElement("div");
       subtitle.className = "text-token-text-secondary text-base";
-      subtitle.textContent = "Switch between saved Codex sessions";
+      subtitle.textContent = t2("accounts.pageSubtitle");
       const sections = document.createElement("div");
       sections.className = "flex flex-col gap-8";
       header.append(heading, subtitle);

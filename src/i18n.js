@@ -1,4 +1,6 @@
 const STRINGS = {
+  "accounts.pageTitle": "Accounts",
+  "accounts.pageSubtitle": "Switch, add, or remove ChatGPT sessions without restarting.",
   "accounts.loading": "Loading saved accounts...",
   "accounts.refresh": "Refresh accounts",
   "accounts.add": "Add account",

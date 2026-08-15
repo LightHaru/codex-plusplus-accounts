@@ -8,6 +8,14 @@ All notable changes to [Codex Accounts](https://github.com/LightHaru/codex-plusp
 
 # English
 
+## 2.5.3 — 2026-08-16
+
+Sidebar Accounts page matches the avatar popup.
+
+- Colored two-letter avatars, teal Current row with check + CURRENT pill, name · plan, and remaining % on the right.
+- Click a row to switch. Three-dot menu still removes a snapshot. Email stays visible for management.
+- Usage remaining header and Auto-switch toggle live on the page, same behavior as the popup.
+
 ## 2.5.2 — 2026-08-16
 
 Security pass on tokens, files, login, and IPC.
@@ -49,6 +57,14 @@ Initial public snapshot (then named Codex Avatar Switcher).
 ---
 
 # Tiếng Việt
+
+## 2.5.3 — 2026-08-16
+
+Trang Accounts trên sidebar đồng bộ với popup avatar.
+
+- Avatar 2 chữ màu, hàng Current teal có check + CURRENT, tên · plan, % bên phải.
+- Bấm hàng để đổi acc. Menu 3 chấm vẫn xóa snapshot. Email giữ lại để quản lý.
+- Header Usage remaining và nút Auto-switch trên trang, cùng hành vi với popup.
 
 ## 2.5.2 — 2026-08-16
 

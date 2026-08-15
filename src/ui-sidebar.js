@@ -1,5 +1,6 @@
 const { compactText, isVisible } = require("./dom-utils");
 const { renderAccountsPage } = require("./ui-settings");
+const { t } = require("./i18n");
 
 const SHORTCUT_ATTR = "data-codexpp-account-switch-shortcut";
 const MAIN_SIDEBAR_SELECTOR =
@@ -222,11 +223,11 @@ function accountsPageShell() {
 
   const heading = document.createElement("div");
   heading.className = "truncate text-2xl font-normal text-token-text-primary";
-  heading.textContent = "Accounts";
+  heading.textContent = t("accounts.pageTitle");
 
   const subtitle = document.createElement("div");
   subtitle.className = "text-token-text-secondary text-base";
-  subtitle.textContent = "Switch between saved Codex sessions";
+  subtitle.textContent = t("accounts.pageSubtitle");
 
   const sections = document.createElement("div");
   sections.className = "flex flex-col gap-8";

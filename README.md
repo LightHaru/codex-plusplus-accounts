@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-2.5.2-4F8CFF?style=flat-square">
+  <img alt="version" src="https://img.shields.io/badge/version-2.5.3-4F8CFF?style=flat-square">
   <img alt="codex++ tweak" src="https://img.shields.io/badge/Codex%2B%2B-tweak-111827?style=flat-square">
   <img alt="platforms" src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square">
   <a href="https://github.com/b-nnett/codex-plusplus"><img alt="requires Codex++" src="https://img.shields.io/badge/requires-Codex%2B%2B-6366f1?style=flat-square"></a>
@@ -44,14 +44,14 @@ Based on [Easy Account Switcher](https://github.com/erknvl/codex-plusplus-accoun
 - Per-account 5-hour and weekly remaining %, plus the next reset weekday / date / time.
 - **Add another subscription** opens a separate OAuth window. The current session is left alone until you click the new account.
 - **Auto-switch when quota runs out** (on by default): hops only when the live account's 5h **or** weekly remaining hits 0, and only to a saved account that still has remaining %. If every account is at 0%, it stays put.
-- Sidebar **Accounts** page is still there if you want to delete a snapshot.
+- Sidebar **Accounts** page matches the popup (avatars, Current, %, click to switch). Three-dot menu still deletes a snapshot.
 
 ## vs Easy Account Switcher
 
 | | Easy Account Switcher | Codex Accounts |
 |---|---|---|
 | Switch | Copy `auth.json`, **restart Codex** | Copy `auth.json`, **no restart** |
-| UI | Accounts page in the sidebar | Avatar popup + sidebar fallback |
+| UI | Accounts page in the sidebar | Avatar popup + matching sidebar page |
 | Quota | Cached 5h / weekly | % on each row, auto-switch when the current one is empty |
 | Add account | Logout + restart | Separate login window, live session kept |
 | Store | Codex++ Tweak Store (`erknvl/...`) | This repo. **Do not Update the Store copy** |
@@ -168,14 +168,14 @@ Phát triển từ [Easy Account Switcher](https://github.com/erknvl/codex-plusp
 - % còn lại 5 giờ / weekly từng acc, kèm thứ / ngày / giờ reset.
 - **Add another subscription** mở cửa sổ OAuth riêng. Session đang dùng giữ nguyên đến khi bấm acc mới.
 - **Auto-switch when quota runs out** (mặc định bật): chỉ nhảy khi acc hiện tại hết 5h **hoặc** weekly (còn 0), và chỉ sang acc còn %. Cả list 0% thì đứng yên.
-- Trang **Accounts** trên sidebar vẫn dùng được để xóa snapshot.
+- Trang **Accounts** trên sidebar giống popup (avatar, Current, %, bấm để đổi). Menu 3 chấm vẫn xóa snapshot.
 
 ## Khác gì bản gốc?
 
 | | Easy Account Switcher | Codex Accounts |
 |---|---|---|
 | Đổi acc | Copy `auth.json` rồi **restart Codex** | Copy `auth.json`, **không restart** |
-| UI | Trang Accounts trên sidebar | Popup avatar + sidebar fallback |
+| UI | Trang Accounts trên sidebar | Popup avatar + trang sidebar cùng style |
 | Quota | Cache 5h / weekly | Hiện % từng acc, auto-switch khi acc hiện tại hết |
 | Add acc | Logout + restart | Cửa sổ login riêng, session đang dùng giữ nguyên |
 | Store | Tweak Store (`erknvl/...`) | Repo này. **Đừng Update bản Store gốc** |
