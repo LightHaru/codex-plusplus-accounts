@@ -6,6 +6,7 @@ const {
   pathExists,
 } = require("../node-utils");
 const { emailFromAuthString } = require("./auth");
+const { isSafeAccountName, protectAuthFile } = require("../security");
 
 async function listAccountNames() {
   const { fsp } = nodeDeps();
@@ -13,8 +14,9 @@ async function listAccountNames() {
   if (!(await pathExists(ACCOUNTS_DIR))) return [];
   const entries = await fsp.readdir(ACCOUNTS_DIR, { withFileTypes: true });
   return entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+    .filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".json"))
     .map((entry) => entry.name.replace(/\.json$/i, ""))
+    .filter((name) => isSafeAccountName(name))
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
@@ -98,6 +100,7 @@ async function ensureAutosavedActiveAccount() {
   const sameEmail = await findMatchingAccountByEmail(accounts, active);
   if (sameEmail) {
     await fsp.copyFile(AUTH_PATH, accountPath(sameEmail));
+    await protectAuthFile(accountPath(sameEmail));
     await fsp.writeFile(CURRENT_NAME_PATH, `${sameEmail}\n`, "utf8");
     return sameEmail;
   }
@@ -105,6 +108,7 @@ async function ensureAutosavedActiveAccount() {
   await ensureDir(ACCOUNTS_DIR);
   const name = await nextAvailableAccountName("account");
   await fsp.copyFile(AUTH_PATH, accountPath(name));
+  await protectAuthFile(accountPath(name));
   await fsp.writeFile(CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return name;
 }

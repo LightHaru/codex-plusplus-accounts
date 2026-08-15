@@ -10,7 +10,7 @@ const { readAccountUsage } = require("./usage");
 const { readAutoswitchEnabled } = require("./settings");
 
 async function readState(extra = {}) {
-  const { AUTH_PATH, ACCOUNTS_DIR, CONFIG_PATH, CURRENT_NAME_PATH } = codexAuthPaths();
+  const { AUTH_PATH } = codexAuthPaths();
   await ensureAutosavedActiveAccount();
   const allAccounts = await listAccountNames();
   const visibleAccounts = await selectVisibleAccounts(allAccounts);
@@ -35,12 +35,6 @@ async function readState(extra = {}) {
     autoswitchEnabled,
     current,
     hasActiveAuth,
-    paths: {
-      auth: AUTH_PATH,
-      accountsDir: ACCOUNTS_DIR,
-      config: CONFIG_PATH,
-      current: CURRENT_NAME_PATH,
-    },
     ...extra,
   };
 }

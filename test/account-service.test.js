@@ -274,25 +274,21 @@ test("switch leaves config unchanged for API account without base URL", async ()
   });
 });
 
-test("switch still copies account when base URL sync cannot parse JSON", async () => {
+test("switch refuses invalid JSON instead of copying it onto live auth", async () => {
   await withTempHome(async (home) => {
     const codexDir = path.join(home, ".codex");
     const accountsDir = path.join(codexDir, "auth_accounts");
     await fs.mkdir(accountsDir, { recursive: true });
+    const live = authWithEmail("me@example.com");
     await fs.writeFile(path.join(accountsDir, "broken.json"), "{not valid json");
-    await fs.writeFile(path.join(codexDir, "auth.json"), authWithEmail("me@example.com"));
-    const warnings = [];
+    await fs.writeFile(path.join(codexDir, "auth.json"), live);
 
     const { createAccountService } = require("../src/account/service");
-    const service = createAccountService({
-      log: { info() {}, warn(message) { warnings.push(message); } },
-    });
+    const service = createAccountService({ log: { info() {}, warn() {} } });
     const result = await service.handle({ action: "switch", name: "broken" });
 
-    assert.equal(result.ok, true);
-    assert.equal(await fs.readFile(path.join(codexDir, "auth.json"), "utf8"), "{not valid json");
-    assert.equal((await fs.readFile(path.join(codexDir, "current_account"), "utf8")).trim(), "broken");
-    assert.match(warnings[0], /skipped base URL sync/);
+    assert.equal(result.ok, false);
+    assert.equal(await fs.readFile(path.join(codexDir, "auth.json"), "utf8"), live);
   });
 });
 
@@ -468,7 +464,7 @@ test("switch copies auth without requiring an app relaunch", async () => {
     assert.equal(result.state.requiresAppRelaunch, false);
     assert.equal(result.state.current, "work");
     assert.equal(result.state.notice, "Switched to work.");
-    assert.equal(await fs.readFile(path.join(codexDir, "auth.json"), "utf8"), work);
+    assert.deepEqual(JSON.parse(await fs.readFile(path.join(codexDir, "auth.json"), "utf8")), JSON.parse(work));
     assert.equal((await fs.readFile(path.join(codexDir, "current_account"), "utf8")).trim(), "work");
   });
 });
@@ -662,5 +658,55 @@ test("set-autoswitch persists enabled flag", async () => {
     assert.equal(raw.enabled, false);
     const on = await service.handle({ action: "set-autoswitch", enabled: true });
     assert.equal(on.state.autoswitchEnabled, true);
+  });
+});
+
+
+test("security helpers reject path traversal and off-site usage redirects", () => {
+  const {
+    isSafeAccountName,
+    isAllowedUsageUrl,
+    isSafeLoginNavigation,
+    isAuthSnapshot,
+    redactSecrets,
+  } = require("../src/security");
+
+  assert.equal(isSafeAccountName("work"), true);
+  assert.equal(isSafeAccountName("../etc"), false);
+  assert.equal(isSafeAccountName("account/../x"), false);
+  assert.equal(isAllowedUsageUrl("https://chatgpt.com/backend-api/wham/usage"), true);
+  assert.equal(isAllowedUsageUrl("https://evil.example/steal"), false);
+  assert.equal(isSafeLoginNavigation("https://auth.openai.com/oauth/authorize"), true);
+  assert.equal(isSafeLoginNavigation("javascript:alert(1)"), false);
+  assert.equal(isSafeLoginNavigation("file:///C:/Windows/notepad.exe"), false);
+  assert.equal(isSafeLoginNavigation("http://localhost:1455/auth/callback"), true);
+  assert.equal(isAuthSnapshot({ tokens: { access_token: "x" } }), true);
+  assert.equal(isAuthSnapshot({ hello: "nope" }), false);
+  assert.match(redactSecrets("Authorization: Bearer eyJabc.def.ghi"), /redacted/i);
+});
+
+test("unknown ipc action is rejected without echoing the payload", async () => {
+  await withTempHome(async () => {
+    const { createAccountService } = require("../src/account/service");
+    const service = createAccountService({ log: { info() {}, warn() {} } });
+    const result = await service.handle({ action: "rm -rf", name: "../x" });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "Unknown account action.");
+  });
+});
+
+test("switch rejects a snapshot that is not Codex auth", async () => {
+  await withTempHome(async (home) => {
+    const codexDir = path.join(home, ".codex");
+    const accountsDir = path.join(codexDir, "auth_accounts");
+    await fs.mkdir(accountsDir, { recursive: true });
+    await fs.writeFile(path.join(accountsDir, "work.json"), JSON.stringify({ note: "not auth" }));
+    await fs.writeFile(path.join(codexDir, "auth.json"), authWithEmail("me@example.com"));
+
+    const { createAccountService } = require("../src/account/service");
+    const service = createAccountService({ log: { info() {}, warn() {} } });
+    const result = await service.handle({ action: "switch", name: "work" });
+    assert.equal(result.ok, false);
+    assert.match(result.error, /not a Codex auth snapshot/i);
   });
 });

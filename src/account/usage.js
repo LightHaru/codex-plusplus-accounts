@@ -1,4 +1,5 @@
 const { nodeDeps, codexAuthPaths, ensureDir } = require("../node-utils");
+const { isAllowedUsageUrl, USAGE_RESPONSE_MAX_BYTES } = require("../security");
 
 const USAGE_HOST = "chatgpt.com";
 const USAGE_PATH = "/backend-api/wham/usage";
@@ -83,7 +84,11 @@ function nodeHttps() {
   return nodeRequire("node:https");
 }
 
-function httpsGetJson(hostname, path, headers) {
+function httpsGetJson(hostname, path, headers, hops = 0) {
+  if (!isAllowedUsageUrl(`https://${hostname}${path}`)) {
+    return Promise.reject(new Error("Blocked unexpected usage host."));
+  }
+  if (hops > 3) return Promise.reject(new Error("Too many usage redirects."));
   return new Promise((resolve, reject) => {
     const req = nodeHttps().request(
       {
@@ -94,14 +99,27 @@ function httpsGetJson(hostname, path, headers) {
       },
       (res) => {
         const chunks = [];
-        res.on("data", (chunk) => chunks.push(chunk));
+        let size = 0;
+        res.on("data", (chunk) => {
+          size += chunk.length;
+          if (size > USAGE_RESPONSE_MAX_BYTES) {
+            req.destroy();
+            reject(new Error("Usage response too large."));
+            return;
+          }
+          chunks.push(chunk);
+        });
         res.on("end", () => {
           const body = Buffer.concat(chunks).toString("utf8");
           const status = res.statusCode || 0;
           if (status >= 300 && status < 400 && res.headers.location) {
             try {
               const next = new URL(res.headers.location, `https://${hostname}${path}`);
-              httpsGetJson(next.hostname, `${next.pathname}${next.search}`, headers).then(resolve, reject);
+              if (!isAllowedUsageUrl(next)) {
+                reject(new Error("Blocked usage redirect off chatgpt.com."));
+                return;
+              }
+              httpsGetJson(next.hostname, `${next.pathname}${next.search}`, headers, hops + 1).then(resolve, reject);
             } catch (error) {
               reject(error);
             }

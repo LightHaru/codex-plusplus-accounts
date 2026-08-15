@@ -18,20 +18,193 @@ var require_constants = __commonJS({
   }
 });
 
+// src/node-utils.js
+var require_node_utils = __commonJS({
+  "src/node-utils.js"(exports2, module2) {
+    var { ACCOUNT_NAME_PATTERN } = require_constants();
+    function nodeDeps2() {
+      return {
+        fs: require("node:fs"),
+        fsp: require("node:fs/promises"),
+        os: require("node:os"),
+        path: require("node:path")
+      };
+    }
+    function codexAuthPaths2() {
+      const { os, path } = nodeDeps2();
+      const CODEX_DIR = path.join(os.homedir(), ".codex");
+      return {
+        CODEX_DIR,
+        AUTH_PATH: path.join(CODEX_DIR, "auth.json"),
+        CONFIG_PATH: path.join(CODEX_DIR, "config.toml"),
+        ACCOUNTS_DIR: path.join(CODEX_DIR, "auth_accounts"),
+        USAGE_CACHE_PATH: path.join(CODEX_DIR, "auth_accounts_usage.json"),
+        CURRENT_NAME_PATH: path.join(CODEX_DIR, "current_account"),
+        AUTOSWITCH_PATH: path.join(CODEX_DIR, "auth_accounts_autoswitch.json")
+      };
+    }
+    function normalizeAccountName2(rawName) {
+      if (typeof rawName !== "string") throw new Error("Account name is required.");
+      const name = rawName.trim().replace(/\.json$/i, "");
+      if (!ACCOUNT_NAME_PATTERN.test(name)) {
+        throw new Error(
+          "Use letters, numbers, dots, underscores, or dashes. The name must start with a letter or number."
+        );
+      }
+      return name;
+    }
+    function accountPath2(name) {
+      const { path } = nodeDeps2();
+      const { assertInsideDir, isSafeAccountName } = require_security();
+      const { ACCOUNTS_DIR } = codexAuthPaths2();
+      if (!isSafeAccountName(name)) throw new Error("Invalid account name.");
+      return assertInsideDir(ACCOUNTS_DIR, path.join(ACCOUNTS_DIR, `${name}.json`));
+    }
+    async function ensureDir2(dir) {
+      const { fsp } = nodeDeps2();
+      await fsp.mkdir(dir, { recursive: true });
+    }
+    async function pathExists2(target) {
+      const { fs, fsp } = nodeDeps2();
+      try {
+        await fsp.access(target, fs.constants.F_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    module2.exports = { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, normalizeAccountName: normalizeAccountName2, accountPath: accountPath2, ensureDir: ensureDir2, pathExists: pathExists2 };
+  }
+});
+
+// src/security.js
+var require_security = __commonJS({
+  "src/security.js"(exports2, module2) {
+    var { ACCOUNT_NAME_PATTERN } = require_constants();
+    var AUTH_SNAPSHOT_MAX_BYTES = 256 * 1024;
+    var USAGE_RESPONSE_MAX_BYTES2 = 1024 * 1024;
+    var USAGE_HOSTS = /* @__PURE__ */ new Set(["chatgpt.com", "www.chatgpt.com"]);
+    function redactSecrets(value) {
+      return String(value ?? "").replace(/Bearer\s+\S+/gi, "Bearer [redacted]").replace(/eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9._-]+/g, "[redacted-jwt]").replace(/sk-[a-zA-Z0-9]{8,}/g, "[redacted-key]").replace(/rt[-_][a-zA-Z0-9_-]{8,}/gi, "[redacted-refresh]");
+    }
+    function isSafeAccountName(name) {
+      return typeof name === "string" && ACCOUNT_NAME_PATTERN.test(name) && !name.includes("..");
+    }
+    function assertInsideDir(dir, target) {
+      const { path } = require_node_utils().nodeDeps();
+      const root = path.resolve(dir);
+      const resolved = path.resolve(target);
+      const rel = path.relative(root, resolved);
+      if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+        throw new Error("Blocked path outside the accounts folder.");
+      }
+      return resolved;
+    }
+    async function protectAuthFile2(filePath) {
+      const { fsp } = require_node_utils().nodeDeps();
+      try {
+        await fsp.chmod(filePath, 384);
+      } catch {
+      }
+    }
+    function isAuthSnapshot(auth) {
+      if (!auth || typeof auth !== "object" || Array.isArray(auth)) return false;
+      const tokens = auth.tokens;
+      const hasAccess = tokens && typeof tokens === "object" && typeof tokens.access_token === "string" && tokens.access_token.length > 0;
+      const hasKey = typeof auth.OPENAI_API_KEY === "string" && auth.OPENAI_API_KEY.length > 0;
+      return Boolean(hasAccess || hasKey);
+    }
+    async function readAuthSnapshotFile2(filePath, label) {
+      const { fs, fsp } = require_node_utils().nodeDeps();
+      let stat;
+      try {
+        stat = await fsp.lstat(filePath);
+      } catch {
+        throw new Error(`${label} was not found.`);
+      }
+      if (stat.isSymbolicLink() || !stat.isFile()) {
+        throw new Error(`${label} must be a regular file.`);
+      }
+      if (stat.size > AUTH_SNAPSHOT_MAX_BYTES) {
+        throw new Error(`${label} is too large to use as an auth snapshot.`);
+      }
+      const raw = await fsp.readFile(filePath, "utf8");
+      let auth;
+      try {
+        auth = JSON.parse(raw);
+      } catch {
+        throw new Error(`${label} is not valid JSON.`);
+      }
+      if (!isAuthSnapshot(auth)) {
+        throw new Error(`${label} is not a Codex auth snapshot.`);
+      }
+      return { auth, raw: `${JSON.stringify(auth, null, 2)}
+` };
+    }
+    async function writeAuthSnapshotFile2(filePath, auth) {
+      const { fsp } = require_node_utils().nodeDeps();
+      if (!isAuthSnapshot(auth)) throw new Error("Refusing to write an invalid auth snapshot.");
+      const raw = `${JSON.stringify(auth, null, 2)}
+`;
+      if (Buffer.byteLength(raw, "utf8") > AUTH_SNAPSHOT_MAX_BYTES) {
+        throw new Error("Auth snapshot is too large to write.");
+      }
+      await fsp.writeFile(filePath, raw, "utf8");
+      await protectAuthFile2(filePath);
+    }
+    function isAllowedUsageUrl2(urlLike, base) {
+      try {
+        const url = typeof urlLike === "string" ? new URL(urlLike, base) : urlLike;
+        return url.protocol === "https:" && USAGE_HOSTS.has(url.hostname);
+      } catch {
+        return false;
+      }
+    }
+    function isSafeLoginNavigation2(url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "https:") return true;
+        if (parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") && parsed.port === "1455") {
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      }
+    }
+    module2.exports = {
+      AUTH_SNAPSHOT_MAX_BYTES,
+      USAGE_RESPONSE_MAX_BYTES: USAGE_RESPONSE_MAX_BYTES2,
+      USAGE_HOSTS,
+      redactSecrets,
+      isSafeAccountName,
+      assertInsideDir,
+      protectAuthFile: protectAuthFile2,
+      isAuthSnapshot,
+      readAuthSnapshotFile: readAuthSnapshotFile2,
+      writeAuthSnapshotFile: writeAuthSnapshotFile2,
+      isAllowedUsageUrl: isAllowedUsageUrl2,
+      isSafeLoginNavigation: isSafeLoginNavigation2
+    };
+  }
+});
+
 // src/utils.js
 var require_utils = __commonJS({
   "src/utils.js"(exports2, module2) {
+    var { redactSecrets } = require_security();
     function ok(state) {
       return { ok: true, state };
     }
     function fail(error) {
-      return { ok: false, error };
+      return { ok: false, error: redactSecrets(error) };
     }
     function errorMessage(error) {
-      return error instanceof Error ? error.message : String(error);
+      return redactSecrets(error instanceof Error ? error.message : String(error));
     }
     function stringifyError(error) {
-      return error instanceof Error ? error.stack || error.message : String(error);
+      const text = error instanceof Error ? error.stack || error.message : String(error);
+      return redactSecrets(text);
     }
     module2.exports = { ok, fail, errorMessage, stringifyError };
   }
@@ -102,63 +275,6 @@ var require_i18n = __commonJS({
   }
 });
 
-// src/node-utils.js
-var require_node_utils = __commonJS({
-  "src/node-utils.js"(exports2, module2) {
-    var { ACCOUNT_NAME_PATTERN } = require_constants();
-    function nodeDeps2() {
-      return {
-        fs: require("node:fs"),
-        fsp: require("node:fs/promises"),
-        os: require("node:os"),
-        path: require("node:path")
-      };
-    }
-    function codexAuthPaths2() {
-      const { os, path } = nodeDeps2();
-      const CODEX_DIR = path.join(os.homedir(), ".codex");
-      return {
-        CODEX_DIR,
-        AUTH_PATH: path.join(CODEX_DIR, "auth.json"),
-        CONFIG_PATH: path.join(CODEX_DIR, "config.toml"),
-        ACCOUNTS_DIR: path.join(CODEX_DIR, "auth_accounts"),
-        USAGE_CACHE_PATH: path.join(CODEX_DIR, "auth_accounts_usage.json"),
-        CURRENT_NAME_PATH: path.join(CODEX_DIR, "current_account"),
-        AUTOSWITCH_PATH: path.join(CODEX_DIR, "auth_accounts_autoswitch.json")
-      };
-    }
-    function normalizeAccountName2(rawName) {
-      if (typeof rawName !== "string") throw new Error("Account name is required.");
-      const name = rawName.trim().replace(/\.json$/i, "");
-      if (!ACCOUNT_NAME_PATTERN.test(name)) {
-        throw new Error(
-          "Use letters, numbers, dots, underscores, or dashes. The name must start with a letter or number."
-        );
-      }
-      return name;
-    }
-    function accountPath2(name) {
-      const { path } = nodeDeps2();
-      const { ACCOUNTS_DIR } = codexAuthPaths2();
-      return path.join(ACCOUNTS_DIR, `${name}.json`);
-    }
-    async function ensureDir2(dir) {
-      const { fsp } = nodeDeps2();
-      await fsp.mkdir(dir, { recursive: true });
-    }
-    async function pathExists2(target) {
-      const { fs, fsp } = nodeDeps2();
-      try {
-        await fsp.access(target, fs.constants.F_OK);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    module2.exports = { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, normalizeAccountName: normalizeAccountName2, accountPath: accountPath2, ensureDir: ensureDir2, pathExists: pathExists2 };
-  }
-});
-
 // src/account/auth.js
 var require_auth = __commonJS({
   "src/account/auth.js"(exports2, module2) {
@@ -226,12 +342,13 @@ var require_storage = __commonJS({
       pathExists: pathExists2
     } = require_node_utils();
     var { emailFromAuthString } = require_auth();
+    var { isSafeAccountName, protectAuthFile: protectAuthFile2 } = require_security();
     async function listAccountNames2() {
       const { fsp } = nodeDeps2();
       const { ACCOUNTS_DIR } = codexAuthPaths2();
       if (!await pathExists2(ACCOUNTS_DIR)) return [];
       const entries = await fsp.readdir(ACCOUNTS_DIR, { withFileTypes: true });
-      return entries.filter((entry) => entry.isFile() && entry.name.endsWith(".json")).map((entry) => entry.name.replace(/\.json$/i, "")).sort((a, b) => a.localeCompare(b, void 0, { sensitivity: "base" }));
+      return entries.filter((entry) => entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".json")).map((entry) => entry.name.replace(/\.json$/i, "")).filter((name) => isSafeAccountName(name)).sort((a, b) => a.localeCompare(b, void 0, { sensitivity: "base" }));
     }
     async function getCurrentAccountName2(accounts) {
       const { fsp, path } = nodeDeps2();
@@ -303,6 +420,7 @@ var require_storage = __commonJS({
       const sameEmail = await findMatchingAccountByEmail2(accounts, active);
       if (sameEmail) {
         await fsp.copyFile(AUTH_PATH, accountPath2(sameEmail));
+        await protectAuthFile2(accountPath2(sameEmail));
         await fsp.writeFile(CURRENT_NAME_PATH, `${sameEmail}
 `, "utf8");
         return sameEmail;
@@ -310,6 +428,7 @@ var require_storage = __commonJS({
       await ensureDir2(ACCOUNTS_DIR);
       const name = await nextAvailableAccountName2("account");
       await fsp.copyFile(AUTH_PATH, accountPath2(name));
+      await protectAuthFile2(accountPath2(name));
       await fsp.writeFile(CURRENT_NAME_PATH, `${name}
 `, "utf8");
       return name;
@@ -371,6 +490,7 @@ var require_storage = __commonJS({
 var require_usage = __commonJS({
   "src/account/usage.js"(exports, module) {
     var { nodeDeps, codexAuthPaths, ensureDir } = require_node_utils();
+    var { isAllowedUsageUrl, USAGE_RESPONSE_MAX_BYTES } = require_security();
     var USAGE_HOST = "chatgpt.com";
     var USAGE_PATH = "/backend-api/wham/usage";
     async function readAccountUsage(accounts) {
@@ -444,7 +564,11 @@ var require_usage = __commonJS({
       const nodeRequire = eval("require");
       return nodeRequire("node:https");
     }
-    function httpsGetJson(hostname, path, headers) {
+    function httpsGetJson(hostname, path, headers, hops = 0) {
+      if (!isAllowedUsageUrl(`https://${hostname}${path}`)) {
+        return Promise.reject(new Error("Blocked unexpected usage host."));
+      }
+      if (hops > 3) return Promise.reject(new Error("Too many usage redirects."));
       return new Promise((resolve, reject) => {
         const req = nodeHttps().request(
           {
@@ -455,14 +579,27 @@ var require_usage = __commonJS({
           },
           (res) => {
             const chunks = [];
-            res.on("data", (chunk) => chunks.push(chunk));
+            let size = 0;
+            res.on("data", (chunk) => {
+              size += chunk.length;
+              if (size > USAGE_RESPONSE_MAX_BYTES) {
+                req.destroy();
+                reject(new Error("Usage response too large."));
+                return;
+              }
+              chunks.push(chunk);
+            });
             res.on("end", () => {
               const body = Buffer.concat(chunks).toString("utf8");
               const status = res.statusCode || 0;
               if (status >= 300 && status < 400 && res.headers.location) {
                 try {
                   const next = new URL(res.headers.location, `https://${hostname}${path}`);
-                  httpsGetJson(next.hostname, `${next.pathname}${next.search}`, headers).then(resolve, reject);
+                  if (!isAllowedUsageUrl(next)) {
+                    reject(new Error("Blocked usage redirect off chatgpt.com."));
+                    return;
+                  }
+                  httpsGetJson(next.hostname, `${next.pathname}${next.search}`, headers, hops + 1).then(resolve, reject);
                 } catch (error) {
                   reject(error);
                 }
@@ -691,7 +828,7 @@ var require_state = __commonJS({
     var { readAccountUsage: readAccountUsage2 } = require_usage();
     var { readAutoswitchEnabled } = require_settings();
     async function readState2(extra = {}) {
-      const { AUTH_PATH, ACCOUNTS_DIR, CONFIG_PATH, CURRENT_NAME_PATH } = codexAuthPaths2();
+      const { AUTH_PATH } = codexAuthPaths2();
       await ensureAutosavedActiveAccount();
       const allAccounts = await listAccountNames2();
       const visibleAccounts = await selectVisibleAccounts(allAccounts);
@@ -714,12 +851,6 @@ var require_state = __commonJS({
         autoswitchEnabled,
         current,
         hasActiveAuth,
-        paths: {
-          auth: AUTH_PATH,
-          accountsDir: ACCOUNTS_DIR,
-          config: CONFIG_PATH,
-          current: CURRENT_NAME_PATH
-        },
         ...extra
       };
     }
@@ -946,9 +1077,9 @@ var require_failover = __commonJS({
 var require_login = __commonJS({
   "src/account/login.js"(exports, module) {
     var crypto = require("node:crypto");
-    var https = require("node:https");
     var { profileFromAuth } = require_auth();
     var { nodeDeps, accountPath, ensureDir } = require_node_utils();
+    var { isSafeLoginNavigation, writeAuthSnapshotFile } = require_security();
     var {
       nextAvailableAccountName,
       findMatchingAccountByEmail,
@@ -965,6 +1096,10 @@ var require_login = __commonJS({
     function electron() {
       const electronRequire = eval("require");
       return electronRequire("electron");
+    }
+    function nodeHttps() {
+      const nodeRequire = eval("require");
+      return nodeRequire("node:https");
     }
     function base64url(buffer) {
       return Buffer.from(buffer).toString("base64url");
@@ -1007,7 +1142,7 @@ var require_login = __commonJS({
     function postForm(pathname, fields) {
       const body = new URLSearchParams(fields).toString();
       return new Promise((resolve, reject) => {
-        const req = https.request(
+        const req = nodeHttps().request(
           {
             hostname: "auth.openai.com",
             path: pathname,
@@ -1116,7 +1251,7 @@ var require_login = __commonJS({
         const base = sanitizeAccountName(profile.name || profile.email?.split("@")[0] || "account");
         name = await nextAvailableAccountName(base);
       }
-      await fsp.writeFile(accountPath(name), raw, "utf8");
+      await writeAuthSnapshotFile(accountPath(name), auth);
       return { name, profile, updated: Boolean(existing) };
     }
     function openLoginWindow(authUrl, expectedState, verifier) {
@@ -1134,6 +1269,8 @@ var require_login = __commonJS({
             if (win && !win.isDestroyed()) win.close();
           } catch {
           }
+          ses.clearStorageData().catch(() => {
+          });
           if (error) reject(error);
           else resolve(tokens);
         };
@@ -1184,13 +1321,19 @@ var require_login = __commonJS({
             }
           });
           win.webContents.setWindowOpenHandler(({ url }) => {
-            if (win && !win.isDestroyed()) win.loadURL(url);
+            if (isSafeLoginNavigation(url) && win && !win.isDestroyed()) win.loadURL(url);
             return { action: "deny" };
           });
-          win.webContents.on("will-redirect", (event, url) => handleUrl(url, event));
-          win.webContents.on("will-navigate", (event, url) => handleUrl(url, event));
-          win.webContents.on("did-navigate", (_event, url) => handleUrl(url));
-          win.webContents.on("did-fail-load", (_event, _code, _desc, url) => handleUrl(url));
+          const onNavigate = (url, event) => {
+            if (handleUrl(url, event)) return;
+            if (!isSafeLoginNavigation(url) && event && typeof event.preventDefault === "function") {
+              event.preventDefault();
+            }
+          };
+          win.webContents.on("will-redirect", (event, url) => onNavigate(url, event));
+          win.webContents.on("will-navigate", (event, url) => onNavigate(url, event));
+          win.webContents.on("did-navigate", (_event, url) => onNavigate(url));
+          win.webContents.on("did-fail-load", (_event, _code, _desc, url) => onNavigate(url));
           win.on("closed", () => {
             if (!settled) finish(new Error("Sign-in cancelled."));
           });
@@ -1253,6 +1396,7 @@ var require_actions = __commonJS({
       setTopLevelOpenAIBaseUrl,
       syncOpenAIBaseUrlForAccount
     } = require_config();
+    var { protectAuthFile, readAuthSnapshotFile } = require_security();
     async function saveCurrentAccount(rawName) {
       const { fsp } = nodeDeps();
       const { AUTH_PATH, ACCOUNTS_DIR, CURRENT_NAME_PATH } = codexAuthPaths();
@@ -1262,6 +1406,7 @@ var require_actions = __commonJS({
       }
       await ensureDir(ACCOUNTS_DIR);
       await saveAuthSnapshotWithCurrentBaseUrl(AUTH_PATH, accountPath(name));
+      await protectAuthFile(accountPath(name));
       await fsp.writeFile(CURRENT_NAME_PATH, `${name}
 `, "utf8");
       return readState({ notice: t("service.saved", { name }) });
@@ -1280,7 +1425,9 @@ var require_actions = __commonJS({
         const message = error instanceof Error ? error.message : String(error);
         api2?.log?.warn?.(`[account-switcher] skipped base URL sync for ${name}: ${message}`);
       }
-      await fsp.copyFile(source, AUTH_PATH);
+      const snapshot = await readAuthSnapshotFile(source, `Saved account ${name}`);
+      await fsp.writeFile(AUTH_PATH, snapshot.raw, "utf8");
+      await protectAuthFile(AUTH_PATH);
       await fsp.writeFile(CURRENT_NAME_PATH, `${name}
 `, "utf8");
       api2?.log?.info?.(
@@ -1501,12 +1648,25 @@ var require_service = __commonJS({
       switchAccount: switchAccount2
     } = require_actions();
     var { readState: readState2 } = require_state();
+    var ACTIONS = /* @__PURE__ */ new Set([
+      "state",
+      "save",
+      "switch",
+      "delete",
+      "clear-active",
+      "refresh-usage",
+      "relaunch",
+      "add-account",
+      "failover-check",
+      "set-autoswitch"
+    ]);
     function createAccountService2(api2) {
       return {
         async handle(message) {
-          const action = message?.action;
+          const action = typeof message?.action === "string" ? message.action : "";
           try {
-            api2.log?.info?.(`[account-switcher] action ${String(action)}`);
+            if (!ACTIONS.has(action)) return fail("Unknown account action.");
+            api2.log?.info?.(`[account-switcher] action ${action}`);
             if (action === "state") return ok(await readState2());
             if (action === "save") return ok(await saveCurrentAccount2(message?.name));
             if (action === "switch") return ok(await switchAccount2(message?.name, api2));
@@ -1517,7 +1677,7 @@ var require_service = __commonJS({
             if (action === "add-account") return ok(await addAccountWithoutRelaunch2(api2));
             if (action === "failover-check") return ok(await maybeFailover2(api2));
             if (action === "set-autoswitch") return ok(await setAutoswitchEnabled2(message?.enabled !== false));
-            return fail(`Unknown account action: ${String(action)}`);
+            return fail("Unknown account action.");
           } catch (error) {
             api2.log.warn("[account-switcher] action failed", stringifyError(error));
             return fail(errorMessage(error));

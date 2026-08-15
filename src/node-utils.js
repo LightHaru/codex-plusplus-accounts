@@ -36,8 +36,10 @@ function normalizeAccountName(rawName) {
 
 function accountPath(name) {
   const { path } = nodeDeps();
+  const { assertInsideDir, isSafeAccountName } = require("./security");
   const { ACCOUNTS_DIR } = codexAuthPaths();
-  return path.join(ACCOUNTS_DIR, `${name}.json`);
+  if (!isSafeAccountName(name)) throw new Error("Invalid account name.");
+  return assertInsideDir(ACCOUNTS_DIR, path.join(ACCOUNTS_DIR, `${name}.json`));
 }
 
 async function ensureDir(dir) {

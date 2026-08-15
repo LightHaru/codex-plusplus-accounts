@@ -16,6 +16,7 @@ const {
   setTopLevelOpenAIBaseUrl,
   syncOpenAIBaseUrlForAccount,
 } = require("./config");
+const { protectAuthFile, readAuthSnapshotFile } = require("../security");
 
 async function saveCurrentAccount(rawName) {
   const { fsp } = nodeDeps();
@@ -26,6 +27,7 @@ async function saveCurrentAccount(rawName) {
   }
   await ensureDir(ACCOUNTS_DIR);
   await saveAuthSnapshotWithCurrentBaseUrl(AUTH_PATH, accountPath(name));
+  await protectAuthFile(accountPath(name));
   await fsp.writeFile(CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return readState({ notice: t("service.saved", { name }) });
 }
@@ -44,7 +46,9 @@ async function switchAccount(rawName, api) {
     const message = error instanceof Error ? error.message : String(error);
     api?.log?.warn?.(`[account-switcher] skipped base URL sync for ${name}: ${message}`);
   }
-  await fsp.copyFile(source, AUTH_PATH);
+  const snapshot = await readAuthSnapshotFile(source, `Saved account ${name}`);
+  await fsp.writeFile(AUTH_PATH, snapshot.raw, "utf8");
+  await protectAuthFile(AUTH_PATH);
   await fsp.writeFile(CURRENT_NAME_PATH, `${name}\n`, "utf8");
   api?.log?.info?.(
     `[account-switcher] switched auth file to ${name}; subsequent host fetches should use the new tokens`,

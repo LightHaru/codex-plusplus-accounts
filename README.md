@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-2.5.1-4F8CFF?style=flat-square">
+  <img alt="version" src="https://img.shields.io/badge/version-2.5.2-4F8CFF?style=flat-square">
   <img alt="codex++ tweak" src="https://img.shields.io/badge/Codex%2B%2B-tweak-111827?style=flat-square">
   <img alt="platforms" src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square">
   <a href="https://github.com/b-nnett/codex-plusplus"><img alt="requires Codex++" src="https://img.shields.io/badge/requires-Codex%2B%2B-6366f1?style=flat-square"></a>

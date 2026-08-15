@@ -1,7 +1,7 @@
 const crypto = require("node:crypto");
-const https = require("node:https");
 const { profileFromAuth } = require("./auth");
 const { nodeDeps, accountPath, ensureDir } = require("../node-utils");
+const { isSafeLoginNavigation, writeAuthSnapshotFile } = require("../security");
 const {
   nextAvailableAccountName,
   findMatchingAccountByEmail,
@@ -22,6 +22,11 @@ let inflight = null;
 function electron() {
   const electronRequire = eval("require");
   return electronRequire("electron");
+}
+
+function nodeHttps() {
+  const nodeRequire = eval("require");
+  return nodeRequire("node:https");
 }
 
 function base64url(buffer) {
@@ -71,7 +76,7 @@ function parseCallback(url) {
 function postForm(pathname, fields) {
   const body = new URLSearchParams(fields).toString();
   return new Promise((resolve, reject) => {
-    const req = https.request(
+    const req = nodeHttps().request(
       {
         hostname: "auth.openai.com",
         path: pathname,
@@ -191,7 +196,7 @@ async function saveIncomingAccount(auth) {
     const base = sanitizeAccountName(profile.name || profile.email?.split("@")[0] || "account");
     name = await nextAvailableAccountName(base);
   }
-  await fsp.writeFile(accountPath(name), raw, "utf8");
+  await writeAuthSnapshotFile(accountPath(name), auth);
   return { name, profile, updated: Boolean(existing) };
 }
 
@@ -213,6 +218,7 @@ function openLoginWindow(authUrl, expectedState, verifier) {
       } catch {
         /* already closed */
       }
+      ses.clearStorageData().catch(() => {});
       if (error) reject(error);
       else resolve(tokens);
     };
@@ -267,13 +273,19 @@ function openLoginWindow(authUrl, expectedState, verifier) {
       });
 
       win.webContents.setWindowOpenHandler(({ url }) => {
-        if (win && !win.isDestroyed()) win.loadURL(url);
+        if (isSafeLoginNavigation(url) && win && !win.isDestroyed()) win.loadURL(url);
         return { action: "deny" };
       });
-      win.webContents.on("will-redirect", (event, url) => handleUrl(url, event));
-      win.webContents.on("will-navigate", (event, url) => handleUrl(url, event));
-      win.webContents.on("did-navigate", (_event, url) => handleUrl(url));
-      win.webContents.on("did-fail-load", (_event, _code, _desc, url) => handleUrl(url));
+      const onNavigate = (url, event) => {
+        if (handleUrl(url, event)) return;
+        if (!isSafeLoginNavigation(url) && event && typeof event.preventDefault === "function") {
+          event.preventDefault();
+        }
+      };
+      win.webContents.on("will-redirect", (event, url) => onNavigate(url, event));
+      win.webContents.on("will-navigate", (event, url) => onNavigate(url, event));
+      win.webContents.on("did-navigate", (_event, url) => onNavigate(url));
+      win.webContents.on("did-fail-load", (_event, _code, _desc, url) => onNavigate(url));
       win.on("closed", () => {
         if (!settled) finish(new Error("Sign-in cancelled."));
       });
