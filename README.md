@@ -24,6 +24,7 @@
 <p align="center">
   A <a href="https://github.com/b-nnett/codex-plusplus">Codex++</a> tweak ·
   <a href="https://github.com/LightHaru/codex-plusplus-accounts">LightHaru/codex-plusplus-accounts</a>
+  · <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 ---
