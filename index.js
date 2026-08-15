@@ -12,6 +12,7 @@
 const { GLOBAL_SERVICE_KEY, IPC_HANDLER_KEY, IPC_CHANNEL } = require("./src/constants");
 const { createAccountService } = require("./src/account/service");
 const { startRenderer } = require("./src/renderer");
+const { startTray, destroyTray } = require("./src/tray");
 
 // ─── Tweak export ─────────────────────────────────────────────────────────────
 
@@ -39,6 +40,11 @@ module.exports = {
   },
 
   stop() {
+    try {
+      destroyTray();
+    } catch {
+      /* main tray may not exist in renderer */
+    }
     const state = this._state;
     if (!state) return;
     state.disposed = true;
@@ -78,5 +84,6 @@ function startMain(api) {
     globalThis[IPC_HANDLER_KEY] = true;
   }
 
+  startTray(api);
   api.log.info("[account-switcher] main provider active");
 }

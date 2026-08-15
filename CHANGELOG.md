@@ -8,6 +8,14 @@ All notable changes to [Codex Accounts](https://github.com/LightHaru/codex-plusp
 
 # English
 
+## 2.5.6 — 2026-08-16
+
+Windows tray icon so you can fully quit ChatGPT.
+
+- Codex Accounts puts an icon in the notification area (overflow). Tooltip: Codex Accounts.
+- Right-click: Show ChatGPT, or Quit (kills leftover `ChatGPT.exe` processes). Left-click restores the window.
+- Official ChatGPT/Codex on Windows 10 often has no tray icon; closing X only hides the window.
+
 ## 2.5.5 — 2026-08-16
 
 Avatar popup account list scrolls when it gets long.
@@ -72,6 +80,14 @@ Initial public snapshot (then named Codex Avatar Switcher).
 ---
 
 # Tiếng Việt
+
+## 2.5.6 — 2026-08-16
+
+Icon khay Windows để tắt hẳn ChatGPT.
+
+- Codex Accounts thêm icon vào khay hệ thống (overflow). Tooltip: Codex Accounts.
+- Chuột phải: Show ChatGPT, hoặc Quit (kill process `ChatGPT.exe` còn sót). Chuột trái mở lại cửa sổ.
+- App ChatGPT/Codex trên Windows 10 thường không hiện tray; bấm X chỉ ẩn cửa sổ.
 
 ## 2.5.5 — 2026-08-16
 

@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <img alt="version" src="https://img.shields.io/badge/version-2.5.5-4F8CFF?style=flat-square">
+  <img alt="version" src="https://img.shields.io/badge/version-2.5.6-4F8CFF?style=flat-square">
   <img alt="codex++ tweak" src="https://img.shields.io/badge/Codex%2B%2B-tweak-111827?style=flat-square">
   <img alt="platforms" src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square">
   <a href="https://github.com/b-nnett/codex-plusplus"><img alt="requires Codex++" src="https://img.shields.io/badge/requires-Codex%2B%2B-6366f1?style=flat-square"></a>
@@ -45,6 +45,7 @@ Based on [Easy Account Switcher](https://github.com/erknvl/codex-plusplus-accoun
 - **Add another subscription** opens a separate OAuth window. The current session is left alone until you click the new account.
 - **Auto-switch when quota runs out** (on by default): hops only when the live account's 5h **or** weekly remaining hits 0, and only to a saved account that still has remaining %. If every account is at 0%, it stays put.
 - Sidebar **Accounts** page matches the popup (avatars, Current, %, click to switch). Three-dot menu still deletes a snapshot.
+- Windows tray icon (**Codex Accounts**) in the notification overflow: left-click shows the window, right-click **Quit** fully kills `ChatGPT.exe`.
 
 ## vs Easy Account Switcher
 
@@ -137,7 +138,7 @@ The real GUI binary is `ChatGPT.exe`, not `Codex.exe`. Calling `app.relaunch()` 
 
 ```sh
 npx esbuild index.js --bundle --platform=node --format=cjs --outfile=index.bundled.js --external:electron
-node --test test/account-service.test.js test/profile-menu.test.js
+node --test test/account-service.test.js test/display.test.js test/profile-menu.test.js test/tray.test.js
 node --check index.js
 node --check index.bundled.js
 ```
@@ -169,6 +170,7 @@ Phát triển từ [Easy Account Switcher](https://github.com/erknvl/codex-plusp
 - **Add another subscription** mở cửa sổ OAuth riêng. Session đang dùng giữ nguyên đến khi bấm acc mới.
 - **Auto-switch when quota runs out** (mặc định bật): chỉ nhảy khi acc hiện tại hết 5h **hoặc** weekly (còn 0), và chỉ sang acc còn %. Cả list 0% thì đứng yên.
 - Trang **Accounts** trên sidebar giống popup (avatar, Current, %, bấm để đổi). Menu 3 chấm vẫn xóa snapshot.
+- Icon khay Windows (**Codex Accounts**) trong overflow: chuột trái mở cửa sổ, chuột phải **Quit** tắt hẳn `ChatGPT.exe`.
 
 ## Khác gì bản gốc?
 
