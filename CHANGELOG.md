@@ -8,6 +8,15 @@ All notable changes to [Codex Accounts](https://github.com/LightHaru/codex-plusp
 
 # English
 
+## 2.5.4 — 2026-08-16
+
+Local privacy and snapshot hardening.
+
+- Auth files are written via a temp file then replace, so a crash is less likely to truncate `auth.json`.
+- Logs and IPC errors redact emails and home paths. Switch/auto-switch logs no longer print account names.
+- Login window still allows HTTPS (needed for SSO) but blocks IP-literal hosts. Token HTTP responses are size-capped.
+- Autosave and clear-active backups go through the same snapshot validator and user-only file mode. Invalid JSON is no longer copied as-is.
+
 ## 2.5.3 — 2026-08-16
 
 Sidebar Accounts page matches the avatar popup.
@@ -57,6 +66,15 @@ Initial public snapshot (then named Codex Avatar Switcher).
 ---
 
 # Tiếng Việt
+
+## 2.5.4 — 2026-08-16
+
+Siết privacy local và cách ghi snapshot.
+
+- Ghi auth qua file tạm rồi replace, giảm rủi ro `auth.json` bị cắt khi crash.
+- Log và lỗi IPC che email, đường dẫn home. Log switch/auto-switch không in tên acc.
+- Cửa sổ login vẫn cho HTTPS (SSO) nhưng chặn host kiểu IP. Response token có giới hạn size.
+- Autosave và backup lúc clear-active đi qua validator snapshot + quyền user-only. JSON hỏng không còn bị copy nguyên.
 
 ## 2.5.3 — 2026-08-16
 

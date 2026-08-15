@@ -6,7 +6,7 @@ const {
   pathExists,
 } = require("../node-utils");
 const { emailFromAuthString } = require("./auth");
-const { isSafeAccountName, protectAuthFile } = require("../security");
+const { isSafeAccountName } = require("../security");
 
 async function listAccountNames() {
   const { fsp } = nodeDeps();
@@ -98,17 +98,17 @@ async function ensureAutosavedActiveAccount() {
 
   const active = await fsp.readFile(AUTH_PATH, "utf8");
   const sameEmail = await findMatchingAccountByEmail(accounts, active);
+  const { readAuthSnapshotFile, writeAuthSnapshotFile } = require("../security");
+  const live = await readAuthSnapshotFile(AUTH_PATH, "Active auth");
   if (sameEmail) {
-    await fsp.copyFile(AUTH_PATH, accountPath(sameEmail));
-    await protectAuthFile(accountPath(sameEmail));
+    await writeAuthSnapshotFile(accountPath(sameEmail), live.auth);
     await fsp.writeFile(CURRENT_NAME_PATH, `${sameEmail}\n`, "utf8");
     return sameEmail;
   }
 
   await ensureDir(ACCOUNTS_DIR);
   const name = await nextAvailableAccountName("account");
-  await fsp.copyFile(AUTH_PATH, accountPath(name));
-  await protectAuthFile(accountPath(name));
+  await writeAuthSnapshotFile(accountPath(name), live.auth);
   await fsp.writeFile(CURRENT_NAME_PATH, `${name}\n`, "utf8");
   return name;
 }

@@ -1,34 +1,20 @@
 const { nodeDeps, codexAuthPaths, ensureDir } = require("../node-utils");
 
 async function saveAuthSnapshotWithCurrentBaseUrl(sourcePath, targetPath) {
-  const { fsp } = nodeDeps();
-  const raw = await fsp.readFile(sourcePath, "utf8");
-  let auth;
-  try {
-    auth = JSON.parse(raw);
-  } catch {
-    await fsp.writeFile(targetPath, raw, "utf8");
-    return;
-  }
-
+  const { readAuthSnapshotFile, writeAuthSnapshotFile } = require("../security");
+  const snapshot = await readAuthSnapshotFile(sourcePath, "Active auth");
+  const auth = snapshot.auth;
   const currentBaseUrl = await readCurrentOpenAIBaseUrl();
   if (isApiKeyAuth(auth) && currentBaseUrl && !accountOpenAIBaseUrl(auth)) {
     auth.base_url = currentBaseUrl;
-    await fsp.writeFile(targetPath, `${JSON.stringify(auth, null, 2)}\n`, "utf8");
-    return;
   }
-
-  await fsp.writeFile(targetPath, raw, "utf8");
+  await writeAuthSnapshotFile(targetPath, auth);
 }
 
 async function readAuthJson(filePath, label) {
-  const { fsp } = nodeDeps();
-  const raw = await fsp.readFile(filePath, "utf8");
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error(`${label} is not valid JSON.`);
-  }
+  const { readAuthSnapshotFile } = require("../security");
+  const snapshot = await readAuthSnapshotFile(filePath, label);
+  return snapshot.auth;
 }
 
 async function syncOpenAIBaseUrlForAccount(auth) {

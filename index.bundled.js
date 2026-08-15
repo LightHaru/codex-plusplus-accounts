@@ -85,7 +85,7 @@ var require_security = __commonJS({
     var USAGE_RESPONSE_MAX_BYTES2 = 1024 * 1024;
     var USAGE_HOSTS = /* @__PURE__ */ new Set(["chatgpt.com", "www.chatgpt.com"]);
     function redactSecrets(value) {
-      return String(value ?? "").replace(/Bearer\s+\S+/gi, "Bearer [redacted]").replace(/eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9._-]+/g, "[redacted-jwt]").replace(/sk-[a-zA-Z0-9]{8,}/g, "[redacted-key]").replace(/rt[-_][a-zA-Z0-9_-]{8,}/gi, "[redacted-refresh]");
+      return String(value ?? "").replace(/Bearer\s+\S+/gi, "Bearer [redacted]").replace(/eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9._-]+/g, "[redacted-jwt]").replace(/sk-[a-zA-Z0-9]{8,}/g, "[redacted-key]").replace(/rt[-_][a-zA-Z0-9_-]{8,}/gi, "[redacted-refresh]").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]").replace(/(?:[A-Za-z]:)?(?:\\|\/)(?:Users|home)(?:\\|\/)[^\s"'\]]+/gi, "[redacted-path]");
     }
     function isSafeAccountName(name) {
       return typeof name === "string" && ACCOUNT_NAME_PATTERN.test(name) && !name.includes("..");
@@ -142,15 +142,25 @@ var require_security = __commonJS({
 ` };
     }
     async function writeAuthSnapshotFile2(filePath, auth) {
-      const { fsp } = require_node_utils().nodeDeps();
       if (!isAuthSnapshot(auth)) throw new Error("Refusing to write an invalid auth snapshot.");
       const raw = `${JSON.stringify(auth, null, 2)}
 `;
       if (Buffer.byteLength(raw, "utf8") > AUTH_SNAPSHOT_MAX_BYTES) {
         throw new Error("Auth snapshot is too large to write.");
       }
-      await fsp.writeFile(filePath, raw, "utf8");
+      await writeFileAtomic(filePath, raw);
       await protectAuthFile2(filePath);
+    }
+    async function writeFileAtomic(filePath, raw) {
+      const { fsp } = require_node_utils().nodeDeps();
+      const tempPath = `${filePath}.tmp`;
+      await fsp.writeFile(tempPath, raw, "utf8");
+      try {
+        await fsp.rename(tempPath, filePath);
+      } catch {
+        await fsp.copyFile(tempPath, filePath);
+        await fsp.rm(tempPath, { force: true });
+      }
     }
     function isAllowedUsageUrl2(urlLike, base) {
       try {
@@ -160,10 +170,16 @@ var require_security = __commonJS({
         return false;
       }
     }
+    function isIpHostname(hostname) {
+      const host = String(hostname || "").replace(/^\[|\]$/g, "");
+      if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return true;
+      if (host.includes(":")) return true;
+      return false;
+    }
     function isSafeLoginNavigation2(url) {
       try {
         const parsed = new URL(url);
-        if (parsed.protocol === "https:") return true;
+        if (parsed.protocol === "https:") return !isIpHostname(parsed.hostname);
         if (parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") && parsed.port === "1455") {
           return true;
         }
@@ -183,8 +199,10 @@ var require_security = __commonJS({
       isAuthSnapshot,
       readAuthSnapshotFile: readAuthSnapshotFile2,
       writeAuthSnapshotFile: writeAuthSnapshotFile2,
+      writeFileAtomic,
       isAllowedUsageUrl: isAllowedUsageUrl2,
-      isSafeLoginNavigation: isSafeLoginNavigation2
+      isSafeLoginNavigation: isSafeLoginNavigation2,
+      isIpHostname
     };
   }
 });
@@ -344,7 +362,7 @@ var require_storage = __commonJS({
       pathExists: pathExists2
     } = require_node_utils();
     var { emailFromAuthString } = require_auth();
-    var { isSafeAccountName, protectAuthFile: protectAuthFile2 } = require_security();
+    var { isSafeAccountName } = require_security();
     async function listAccountNames2() {
       const { fsp } = nodeDeps2();
       const { ACCOUNTS_DIR } = codexAuthPaths2();
@@ -420,17 +438,17 @@ var require_storage = __commonJS({
       }
       const active = await fsp.readFile(AUTH_PATH, "utf8");
       const sameEmail = await findMatchingAccountByEmail2(accounts, active);
+      const { readAuthSnapshotFile: readAuthSnapshotFile2, writeAuthSnapshotFile: writeAuthSnapshotFile2 } = require_security();
+      const live = await readAuthSnapshotFile2(AUTH_PATH, "Active auth");
       if (sameEmail) {
-        await fsp.copyFile(AUTH_PATH, accountPath2(sameEmail));
-        await protectAuthFile2(accountPath2(sameEmail));
+        await writeAuthSnapshotFile2(accountPath2(sameEmail), live.auth);
         await fsp.writeFile(CURRENT_NAME_PATH, `${sameEmail}
 `, "utf8");
         return sameEmail;
       }
       await ensureDir2(ACCOUNTS_DIR);
       const name = await nextAvailableAccountName2("account");
-      await fsp.copyFile(AUTH_PATH, accountPath2(name));
-      await protectAuthFile2(accountPath2(name));
+      await writeAuthSnapshotFile2(accountPath2(name), live.auth);
       await fsp.writeFile(CURRENT_NAME_PATH, `${name}
 `, "utf8");
       return name;
@@ -907,32 +925,19 @@ var require_config = __commonJS({
   "src/account/config.js"(exports2, module2) {
     var { nodeDeps: nodeDeps2, codexAuthPaths: codexAuthPaths2, ensureDir: ensureDir2 } = require_node_utils();
     async function saveAuthSnapshotWithCurrentBaseUrl2(sourcePath, targetPath) {
-      const { fsp } = nodeDeps2();
-      const raw = await fsp.readFile(sourcePath, "utf8");
-      let auth;
-      try {
-        auth = JSON.parse(raw);
-      } catch {
-        await fsp.writeFile(targetPath, raw, "utf8");
-        return;
-      }
+      const { readAuthSnapshotFile: readAuthSnapshotFile2, writeAuthSnapshotFile: writeAuthSnapshotFile2 } = require_security();
+      const snapshot = await readAuthSnapshotFile2(sourcePath, "Active auth");
+      const auth = snapshot.auth;
       const currentBaseUrl = await readCurrentOpenAIBaseUrl();
       if (isApiKeyAuth(auth) && currentBaseUrl && !accountOpenAIBaseUrl(auth)) {
         auth.base_url = currentBaseUrl;
-        await fsp.writeFile(targetPath, `${JSON.stringify(auth, null, 2)}
-`, "utf8");
-        return;
       }
-      await fsp.writeFile(targetPath, raw, "utf8");
+      await writeAuthSnapshotFile2(targetPath, auth);
     }
     async function readAuthJson2(filePath, label) {
-      const { fsp } = nodeDeps2();
-      const raw = await fsp.readFile(filePath, "utf8");
-      try {
-        return JSON.parse(raw);
-      } catch {
-        throw new Error(`${label} is not valid JSON.`);
-      }
+      const { readAuthSnapshotFile: readAuthSnapshotFile2 } = require_security();
+      const snapshot = await readAuthSnapshotFile2(filePath, label);
+      return snapshot.auth;
     }
     async function syncOpenAIBaseUrlForAccount2(auth) {
       if (!isApiKeyAuth(auth)) {
@@ -1078,7 +1083,6 @@ var require_failover = __commonJS({
 // src/account/login.js
 var require_login = __commonJS({
   "src/account/login.js"(exports, module) {
-    var crypto = require("node:crypto");
     var { profileFromAuth } = require_auth();
     var { nodeDeps, accountPath, ensureDir } = require_node_utils();
     var { isSafeLoginNavigation, writeAuthSnapshotFile } = require_security();
@@ -1103,16 +1107,21 @@ var require_login = __commonJS({
       const nodeRequire = eval("require");
       return nodeRequire("node:https");
     }
+    function nodeCrypto() {
+      const nodeRequire = eval("require");
+      return nodeRequire("node:crypto");
+    }
+    var TOKEN_RESPONSE_MAX_BYTES = 256 * 1024;
     function base64url(buffer) {
       return Buffer.from(buffer).toString("base64url");
     }
     function generatePkce() {
-      const verifier = base64url(crypto.randomBytes(32));
-      const challenge = base64url(crypto.createHash("sha256").update(verifier).digest());
+      const verifier = base64url(nodeCrypto().randomBytes(32));
+      const challenge = base64url(nodeCrypto().createHash("sha256").update(verifier).digest());
       return { verifier, challenge };
     }
     function generateState() {
-      return base64url(crypto.randomBytes(32));
+      return base64url(nodeCrypto().randomBytes(32));
     }
     function buildAuthorizeUrl(challenge, state) {
       const query = new URLSearchParams({
@@ -1156,7 +1165,16 @@ var require_login = __commonJS({
           },
           (res) => {
             const chunks = [];
-            res.on("data", (chunk) => chunks.push(chunk));
+            let size = 0;
+            res.on("data", (chunk) => {
+              size += chunk.length;
+              if (size > TOKEN_RESPONSE_MAX_BYTES) {
+                req.destroy();
+                reject(new Error("Token response too large."));
+                return;
+              }
+              chunks.push(chunk);
+            });
             res.on("end", () => {
               resolve({
                 status: res.statusCode || 0,
@@ -1404,7 +1422,7 @@ var require_actions = __commonJS({
       const { AUTH_PATH, ACCOUNTS_DIR, CURRENT_NAME_PATH } = codexAuthPaths();
       const name = normalizeAccountName(rawName);
       if (!await pathExists(AUTH_PATH)) {
-        throw new Error(`No active Codex auth file found at ${AUTH_PATH}`);
+        throw new Error("No active Codex auth file found.");
       }
       await ensureDir(ACCOUNTS_DIR);
       await saveAuthSnapshotWithCurrentBaseUrl(AUTH_PATH, accountPath(name));
@@ -1418,14 +1436,14 @@ var require_actions = __commonJS({
       const { CODEX_DIR, AUTH_PATH, CURRENT_NAME_PATH } = codexAuthPaths();
       const name = normalizeAccountName(rawName);
       const source = accountPath(name);
-      if (!await pathExists(source)) throw new Error(`Saved account not found: ${name}`);
+      if (!await pathExists(source)) throw new Error("Saved account not found.");
       await ensureDir(CODEX_DIR);
       try {
         const account = await readAuthJson(source, `Saved account ${name}`);
         await syncOpenAIBaseUrlForAccount(account);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        api2?.log?.warn?.(`[account-switcher] skipped base URL sync for ${name}: ${message}`);
+        api2?.log?.warn?.(`[account-switcher] skipped base URL sync: ${message}`);
       }
       const snapshot = await readAuthSnapshotFile(source, `Saved account ${name}`);
       await fsp.writeFile(AUTH_PATH, snapshot.raw, "utf8");
@@ -1433,7 +1451,7 @@ var require_actions = __commonJS({
       await fsp.writeFile(CURRENT_NAME_PATH, `${name}
 `, "utf8");
       api2?.log?.info?.(
-        `[account-switcher] switched auth file to ${name}; subsequent host fetches should use the new tokens`
+        "[account-switcher] switched live auth snapshot; subsequent host fetches should use the new tokens"
       );
       await nudgeLiveSessionAfterSwitch(api2, name);
       return readState({
@@ -1459,11 +1477,11 @@ var require_actions = __commonJS({
       }
       try {
         await refreshUsageForSavedAccount(name, api2, { allowLiveFallback: true });
-        api2?.log?.info?.(`[account-switcher] post-switch usage fetch succeeded for ${name}`);
+        api2?.log?.info?.("[account-switcher] post-switch usage fetch succeeded");
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         api2?.log?.warn?.(
-          `[account-switcher] post-switch usage fetch failed for ${name}: ${message}`
+          `[account-switcher] post-switch usage fetch failed: ${message}`
         );
       }
     }
@@ -1498,8 +1516,14 @@ var require_actions = __commonJS({
       await ensureDir(CODEX_DIR);
       await setTopLevelOpenAIBaseUrl(null);
       if (await pathExists(AUTH_PATH)) {
-        const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-        await fsp.copyFile(AUTH_PATH, path.join(CODEX_DIR, `auth.account-switcher-backup-${stamp}.json`));
+        const { readAuthSnapshotFile: readAuthSnapshotFile2, writeAuthSnapshotFile: writeAuthSnapshotFile2 } = require_security();
+        try {
+          const snapshot = await readAuthSnapshotFile2(AUTH_PATH, "Active auth");
+          await writeAuthSnapshotFile2(path.join(CODEX_DIR, "auth.switcher-backup.json"), snapshot.auth);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          api2?.log?.warn?.(`[account-switcher] skipped auth backup: ${message}`);
+        }
         await fsp.rm(AUTH_PATH, { force: true });
       }
       await fsp.rm(CURRENT_NAME_PATH, { force: true });
@@ -1532,7 +1556,7 @@ var require_actions = __commonJS({
           await refreshUsageForSavedAccount(name, api2, { allowLiveFallback: name === current });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          api2?.log?.warn?.(`[account-switcher] usage fetch failed for ${name}: ${message}`);
+          api2?.log?.warn?.(`[account-switcher] usage fetch failed: ${message}`);
         }
       }
     }
@@ -1562,7 +1586,7 @@ var require_actions = __commonJS({
           );
           if (!next) break;
           api2?.log?.info?.(
-            `[account-switcher] quota empty on ${state.current}; auto-switching to ${next}`
+            "[account-switcher] quota empty on live account; auto-switching to another saved snapshot"
           );
           state = await switchAccount(next, api2);
           from = from || state.current;
@@ -1601,12 +1625,12 @@ var require_actions = __commonJS({
         }
       }
       const notice = saved.updated ? t("service.updated", { name: saved.name }) : t("service.added", { name: saved.name });
-      api2?.log?.info?.(`[account-switcher] added account snapshot ${saved.name} without touching live session`);
+      api2?.log?.info?.("[account-switcher] added account snapshot without touching live session");
       try {
         await refreshUsageForSavedAccount(saved.name, api2, { allowLiveFallback: false });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        api2?.log?.warn?.(`[account-switcher] usage fetch failed for new account ${saved.name}: ${message}`);
+        api2?.log?.warn?.(`[account-switcher] usage fetch failed for new account: ${message}`);
       }
       return readState({ notice, requiresAppRelaunch: false });
     }

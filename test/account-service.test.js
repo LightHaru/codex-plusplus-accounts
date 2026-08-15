@@ -358,7 +358,10 @@ test("state refreshes matching saved email instead of creating generic autosave"
     assert.equal(result.ok, true);
     assert.deepEqual(result.state.accounts, ["work"]);
     assert.equal(result.state.current, "work");
-    assert.equal(await fs.readFile(path.join(accountsDir, "work.json"), "utf8"), refreshedAuth);
+    assert.deepEqual(
+      JSON.parse(await fs.readFile(path.join(accountsDir, "work.json"), "utf8")),
+      JSON.parse(refreshedAuth),
+    );
     await assert.rejects(fs.stat(path.join(accountsDir, "account.json")), { code: "ENOENT" });
   });
 });
@@ -680,9 +683,12 @@ test("security helpers reject path traversal and off-site usage redirects", () =
   assert.equal(isSafeLoginNavigation("javascript:alert(1)"), false);
   assert.equal(isSafeLoginNavigation("file:///C:/Windows/notepad.exe"), false);
   assert.equal(isSafeLoginNavigation("http://localhost:1455/auth/callback"), true);
+  assert.equal(isSafeLoginNavigation("https://8.8.8.8/"), false);
+  assert.equal(isSafeLoginNavigation("https://127.0.0.1/login"), false);
   assert.equal(isAuthSnapshot({ tokens: { access_token: "x" } }), true);
   assert.equal(isAuthSnapshot({ hello: "nope" }), false);
   assert.match(redactSecrets("Authorization: Bearer eyJabc.def.ghi"), /redacted/i);
+  assert.match(redactSecrets("contact me@example.com"), /redacted-email/);
 });
 
 test("unknown ipc action is rejected without echoing the payload", async () => {

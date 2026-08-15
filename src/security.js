@@ -9,7 +9,9 @@ function redactSecrets(value) {
     .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
     .replace(/eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9._-]+/g, "[redacted-jwt]")
     .replace(/sk-[a-zA-Z0-9]{8,}/g, "[redacted-key]")
-    .replace(/rt[-_][a-zA-Z0-9_-]{8,}/gi, "[redacted-refresh]");
+    .replace(/rt[-_][a-zA-Z0-9_-]{8,}/gi, "[redacted-refresh]")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .replace(/(?:[A-Za-z]:)?(?:\\|\/)(?:Users|home)(?:\\|\/)[^\s"'\]]+/gi, "[redacted-path]");
 }
 
 function isSafeAccountName(name) {
@@ -76,14 +78,25 @@ async function readAuthSnapshotFile(filePath, label) {
 }
 
 async function writeAuthSnapshotFile(filePath, auth) {
-  const { fsp } = require("./node-utils").nodeDeps();
   if (!isAuthSnapshot(auth)) throw new Error("Refusing to write an invalid auth snapshot.");
   const raw = `${JSON.stringify(auth, null, 2)}\n`;
   if (Buffer.byteLength(raw, "utf8") > AUTH_SNAPSHOT_MAX_BYTES) {
     throw new Error("Auth snapshot is too large to write.");
   }
-  await fsp.writeFile(filePath, raw, "utf8");
+  await writeFileAtomic(filePath, raw);
   await protectAuthFile(filePath);
+}
+
+async function writeFileAtomic(filePath, raw) {
+  const { fsp } = require("./node-utils").nodeDeps();
+  const tempPath = `${filePath}.tmp`;
+  await fsp.writeFile(tempPath, raw, "utf8");
+  try {
+    await fsp.rename(tempPath, filePath);
+  } catch {
+    await fsp.copyFile(tempPath, filePath);
+    await fsp.rm(tempPath, { force: true });
+  }
 }
 
 function isAllowedUsageUrl(urlLike, base) {
@@ -95,10 +108,17 @@ function isAllowedUsageUrl(urlLike, base) {
   }
 }
 
+function isIpHostname(hostname) {
+  const host = String(hostname || "").replace(/^\[|\]$/g, "");
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return true;
+  if (host.includes(":")) return true;
+  return false;
+}
+
 function isSafeLoginNavigation(url) {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol === "https:") return true;
+    if (parsed.protocol === "https:") return !isIpHostname(parsed.hostname);
     if (
       parsed.protocol === "http:" &&
       (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") &&
@@ -123,6 +143,8 @@ module.exports = {
   isAuthSnapshot,
   readAuthSnapshotFile,
   writeAuthSnapshotFile,
+  writeFileAtomic,
   isAllowedUsageUrl,
   isSafeLoginNavigation,
+  isIpHostname,
 };

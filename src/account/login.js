@@ -1,4 +1,3 @@
-const crypto = require("node:crypto");
 const { profileFromAuth } = require("./auth");
 const { nodeDeps, accountPath, ensureDir } = require("../node-utils");
 const { isSafeLoginNavigation, writeAuthSnapshotFile } = require("../security");
@@ -29,18 +28,25 @@ function nodeHttps() {
   return nodeRequire("node:https");
 }
 
+function nodeCrypto() {
+  const nodeRequire = eval("require");
+  return nodeRequire("node:crypto");
+}
+
+const TOKEN_RESPONSE_MAX_BYTES = 256 * 1024;
+
 function base64url(buffer) {
   return Buffer.from(buffer).toString("base64url");
 }
 
 function generatePkce() {
-  const verifier = base64url(crypto.randomBytes(32));
-  const challenge = base64url(crypto.createHash("sha256").update(verifier).digest());
+  const verifier = base64url(nodeCrypto().randomBytes(32));
+  const challenge = base64url(nodeCrypto().createHash("sha256").update(verifier).digest());
   return { verifier, challenge };
 }
 
 function generateState() {
-  return base64url(crypto.randomBytes(32));
+  return base64url(nodeCrypto().randomBytes(32));
 }
 
 function buildAuthorizeUrl(challenge, state) {
@@ -88,7 +94,16 @@ function postForm(pathname, fields) {
       },
       (res) => {
         const chunks = [];
-        res.on("data", (chunk) => chunks.push(chunk));
+        let size = 0;
+        res.on("data", (chunk) => {
+          size += chunk.length;
+          if (size > TOKEN_RESPONSE_MAX_BYTES) {
+            req.destroy();
+            reject(new Error("Token response too large."));
+            return;
+          }
+          chunks.push(chunk);
+        });
         res.on("end", () => {
           resolve({
             status: res.statusCode || 0,

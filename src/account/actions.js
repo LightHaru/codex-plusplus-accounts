@@ -23,7 +23,7 @@ async function saveCurrentAccount(rawName) {
   const { AUTH_PATH, ACCOUNTS_DIR, CURRENT_NAME_PATH } = codexAuthPaths();
   const name = normalizeAccountName(rawName);
   if (!(await pathExists(AUTH_PATH))) {
-    throw new Error(`No active Codex auth file found at ${AUTH_PATH}`);
+    throw new Error("No active Codex auth file found.");
   }
   await ensureDir(ACCOUNTS_DIR);
   await saveAuthSnapshotWithCurrentBaseUrl(AUTH_PATH, accountPath(name));
@@ -37,21 +37,21 @@ async function switchAccount(rawName, api) {
   const { CODEX_DIR, AUTH_PATH, CURRENT_NAME_PATH } = codexAuthPaths();
   const name = normalizeAccountName(rawName);
   const source = accountPath(name);
-  if (!(await pathExists(source))) throw new Error(`Saved account not found: ${name}`);
+  if (!(await pathExists(source))) throw new Error("Saved account not found.");
   await ensureDir(CODEX_DIR);
   try {
     const account = await readAuthJson(source, `Saved account ${name}`);
     await syncOpenAIBaseUrlForAccount(account);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    api?.log?.warn?.(`[account-switcher] skipped base URL sync for ${name}: ${message}`);
+    api?.log?.warn?.(`[account-switcher] skipped base URL sync: ${message}`);
   }
   const snapshot = await readAuthSnapshotFile(source, `Saved account ${name}`);
   await fsp.writeFile(AUTH_PATH, snapshot.raw, "utf8");
   await protectAuthFile(AUTH_PATH);
   await fsp.writeFile(CURRENT_NAME_PATH, `${name}\n`, "utf8");
   api?.log?.info?.(
-    `[account-switcher] switched auth file to ${name}; subsequent host fetches should use the new tokens`,
+    "[account-switcher] switched live auth snapshot; subsequent host fetches should use the new tokens",
   );
   await nudgeLiveSessionAfterSwitch(api, name);
   return readState({
@@ -88,11 +88,11 @@ async function nudgeLiveSessionAfterSwitch(api, name) {
 
   try {
     await refreshUsageForSavedAccount(name, api, { allowLiveFallback: true });
-    api?.log?.info?.(`[account-switcher] post-switch usage fetch succeeded for ${name}`);
+    api?.log?.info?.("[account-switcher] post-switch usage fetch succeeded");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     api?.log?.warn?.(
-      `[account-switcher] post-switch usage fetch failed for ${name}: ${message}`,
+      `[account-switcher] post-switch usage fetch failed: ${message}`,
     );
   }
 }
@@ -132,8 +132,14 @@ async function clearActiveAuth(api) {
   await ensureDir(CODEX_DIR);
   await setTopLevelOpenAIBaseUrl(null);
   if (await pathExists(AUTH_PATH)) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    await fsp.copyFile(AUTH_PATH, path.join(CODEX_DIR, `auth.account-switcher-backup-${stamp}.json`));
+    const { readAuthSnapshotFile, writeAuthSnapshotFile } = require("../security");
+    try {
+      const snapshot = await readAuthSnapshotFile(AUTH_PATH, "Active auth");
+      await writeAuthSnapshotFile(path.join(CODEX_DIR, "auth.switcher-backup.json"), snapshot.auth);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      api?.log?.warn?.(`[account-switcher] skipped auth backup: ${message}`);
+    }
     await fsp.rm(AUTH_PATH, { force: true });
   }
   await fsp.rm(CURRENT_NAME_PATH, { force: true });
@@ -168,7 +174,7 @@ async function refreshAllSavedAccountUsage(api) {
       await refreshUsageForSavedAccount(name, api, { allowLiveFallback: name === current });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      api?.log?.warn?.(`[account-switcher] usage fetch failed for ${name}: ${message}`);
+      api?.log?.warn?.(`[account-switcher] usage fetch failed: ${message}`);
     }
   }
 }
@@ -202,7 +208,7 @@ async function maybeFailover(api) {
       );
       if (!next) break;
       api?.log?.info?.(
-        `[account-switcher] quota empty on ${state.current}; auto-switching to ${next}`,
+        "[account-switcher] quota empty on live account; auto-switching to another saved snapshot",
       );
       state = await switchAccount(next, api);
       from = from || state.current;
@@ -248,12 +254,12 @@ async function addAccountWithoutRelaunch(api) {
   const notice = saved.updated
     ? t("service.updated", { name: saved.name })
     : t("service.added", { name: saved.name });
-  api?.log?.info?.(`[account-switcher] added account snapshot ${saved.name} without touching live session`);
+  api?.log?.info?.("[account-switcher] added account snapshot without touching live session");
   try {
     await refreshUsageForSavedAccount(saved.name, api, { allowLiveFallback: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    api?.log?.warn?.(`[account-switcher] usage fetch failed for new account ${saved.name}: ${message}`);
+    api?.log?.warn?.(`[account-switcher] usage fetch failed for new account: ${message}`);
   }
   return readState({ notice, requiresAppRelaunch: false });
 }
